@@ -1,113 +1,178 @@
 from collections import OrderedDict
 import numpy as np
-from weakref import ref
 
 
-class ArrayWrapper(object):
+class Column(object):
+    ''' Backs up data.
+    '''
 
-    __slots__ = (
-        'array',
-        'references'
-    )
+    def get(self,):
+        """Returns a numpy array with the
+        column values"""
+        raise NotImplementedError()
+
+    def nb_rows(self,):
+        raise NotImplementedError()
+
+    def inc_ref(self, col_id):
+        pass
+
+    def dec_ref(self,):
+        pass
+
+    def dtype(self, col_id):
+        raise NotImplementedError()
+
+
+class MemoryColumn(Column):
 
     def __init__(self, data):
         self.data = data
-        self.references = []
+        self.ref_count = 0
 
-    def add_ref(self, df):
-        self.references.append(df)
+    def get(self,):
+        return self.data
+
+    def inc_ref(self,):
+        self.ref_count += 1
+
+    def dec_ref(self,):
+        self.ref_count -= 1
+
+    def cell(self, row):
+        return self.data[row]
+
+    @property
+    def nb_rows(self,):
+        return self.data.shape[0]
+
+    @property
+    def dtype(self,):
+        return self.data.dtype
+
+    def pick(self, row_selector):
+        return MemoryColumn(self.data[row_selector])
+
+
+class ColumnRef(object):
+
+    __slots__ = ('column',)
+
+    def __init__(self, column,):
+        self.column = column
+        self.column.inc_ref()
+
+    def __del__(self,):
+        self.column.dec_ref()
+
+    def cell(self, row):
+        return self.column.cell(row)
+
+    def data_copy(self,):
+        return self.column.get().copy()
+
+    @property
+    def nb_rows(self,):
+        return self.column.nb_rows
+
+    @property
+    def dtype(self,):
+        return self.column.dtype
+
+    def pick(self, row_selector):
+        return ColumnRef(self.column.pick(row_selector))
 
 
 class DataFrame(object):
 
     __slots__ = (
-        'column_index',
-        '_data',
-        'column_idx')
+        '__col_map',
+        'nb_rows',
+    )
 
-    @def data():
-        doc = "The data property."
-        def fget(self):
-            return self. data
-        def fset(self, data_):
-            self._data.references.remove_ref(self,)
-            self. data = data_
-            self._data.references.add_ref(self,)
-        def fdel(self):
-            raise NotImplementedError()
-        return locals()
-    data = property(* data())
+    def __init__(self, col_map):
+        self.__col_map = col_map
+        self.nb_rows = col_map.values()[0].nb_rows
+
+    @property
+    def dtypes(self,):
+        return tuple(col.dtype for col in self.__col_map.values())
 
     @staticmethod
-    def from_items(column_items):
-        nb_columns = len(column_items)
-        if nb_columns == 0:
-            return DataFrame([], np.zeros((0, 0)))
-        (column_names, column_values) = zip(*column_items)
-        nb_rows = column_values[0].shape[0]
-        for (_, column_value) in column_items:
-            column_shape = column_value.shape
-            if column_shape != (nb_rows,):
-                raise ValueError("Column values does not have a vector-like shape")
-        data = np.empty((nb_rows, nb_columns))
-        column_index = OrderedDict()
-        for (column_id, (column, column_data)) in enumerate(column_items):
-            column_index[column] = column_id
-            data[:, column_id] = column_data
-        return DataFrame(column_index=column_index,
-                         data=data)
+    def from_items(col_items):
+        col_map = OrderedDict()
+        nb_rows = None
+        for (col_name, col_values) in col_items:
+            column = MemoryColumn(col_values.copy())
+            column_ref = ColumnRef(column)
+            col_map[col_name] = column_ref
+            if nb_rows is None:
+                if len(col_values.shape) != 1:
+                    raise ValueError("Column must have vector-like shaped.")
+                nb_rows = col_values.shape[0]
+            else:
+                if (nb_rows,) != col_values.shape:
+                    raise ValueError("Column %s has shape %s, expected %s.") % \
+                        (col_name, str(col_values.shape), str(col_values.shape))
+        return DataFrame(col_map=col_map,)
 
     @staticmethod
-    def from_map(column_map):
-        return DataFrame.from_items(column_map.items())
-
-    def __getitem__(self, col):
-        if col not in self.column_index:
-            raise ValueError("Column %s is not in DataFrame" % col)
-        col_id = self.column_index[col]
-        return self.data[:, col_id]
+    def from_dict(col_dict):
+        return DataFrame.from_items(col_dict.items())
 
     def _col_id(self, col):
-        if col not in self.column_index:
+        if col not in self.__col_map:
             ValueError("Column %s not in DataFrame." % col)
-        return self.column_index[col]
+        return self.__col_map[col]
+
+    def __getitem__(self, select_spec):
+        if isinstance(select_spec, tuple):
+            assert len(select_spec) == 2, ("DataFrame [] notations handles and most "
+                                           "[row_selector], and [row_selector,column_selector]")
+        else:
+            return self.pick(select_spec)
+        return self.row_select(self, slice)
 
     def __setitem__(self, col, value):
         col_id = self._col_id(col)
         self.data[:, col_id] = value
 
+    def pick(self, row_selector):
+        """ like select but for rows """
+        return self.map_columns(lambda col_val: col_val.pick(row_selector))
+
+    def map_columns(self, f):
+        return DataFrame(col_map=OrderedDict(
+            (col_name, f(col_val))
+            for (col_name, col_val) in self.__col_map.items()
+        ))
+
     def select(self, columns):
         """ Select a subset of columns """
-        column_ids = []
-        column_index = OrderedDict()
-        for column in columns:
-            col_id = self._col_id(column)
-            column_ids.append(col_id)
-        return DataFrame(column_index, self.data[:, column_index])
+        col_map = OrderedDict(
+            (col_name, self.__col_map[col_name])
+            for col_name in columns
+        )
+        return DataFrame(col_map=col_map)
 
     @property
     def nb_cols(self,):
-        return self.shape[1]
-
-    @property
-    def nb_rows(self,):
-        return self.shape[0]
+        return len(self.__col_map)
 
     def head(self, nb_rows=10):
         if self.nb_rows <= 10:
             return self
-        return DataFrame(column_index=self.column_index, data=self.data[:nb_rows, :])
-
-    def __init__(self, column_index, data):
-        self.column_index = column_index
-        self.data = data
+        return DataFrame(column_index=self.column_index, data=self.data[:nb_rows])
 
     @property
     def shape(self,):
-        return self.data.shape
+        return (self.nb_rows, self.nb_cols)
 
     def row(self, row):
-        return self.data[row, self.column_idx]
+        return np.array([
+            col_ref.cell(row)
+            for col_ref in self.__col_map.values()
+        ])
 
     def record(self, row):
         return dict(self.columns, self.data[row])
@@ -116,7 +181,7 @@ class DataFrame(object):
         return " | ".join(self.columns)
 
     def str_body(self,):
-        return " | ".join(
+        return "\n".join(
             self.str_row(row_id)
             for row_id in range(min(10, self.nb_rows))
         )
@@ -125,8 +190,8 @@ class DataFrame(object):
         return " | ".join(self.row(i))
 
     def __str__(self,):
-        return self.str_header() + self.str_body()
+        return self.str_header() + "\n" + self.str_body()
 
     @property
     def columns(self,):
-        return self.column_index.keys()
+        return self.__col_map.keys()
