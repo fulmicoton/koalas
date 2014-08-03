@@ -4,18 +4,22 @@
 import numpy as np
 cimport numpy as np
 from cpython.ref cimport PyObject, Py_INCREF, Py_DECREF
+from collections import deque
 
 
 cdef extern from "_csv_reader.hpp" namespace "koalas":
+
+    cdef cppclass _Field:
+        Py_UNICODE* s
+        int length
 
     cdef cppclass _CsvReader:
         _CsvReader() except + 
         _CsvChunk* read_chunk(Py_UNICODE* buff, const int buffer_length)
 
-
     cdef cppclass _CsvChunk:
         _CsvChunk(int buffersize) except +
-        const Py_UNICODE* get(int i, int j) const
+        const _Field* get(int i, int j) const
         int nb_rows() const
         int nb_columns() const
 
@@ -35,11 +39,11 @@ cdef class CsvChunk:
         del self._csv_chunk
 
     def get(self, int i, int j):
-        cdef const Py_UNICODE* cell = self._csv_chunk.get(i, j)
-        if cell == NULL:
+        cdef const _Field* field = self._csv_chunk.get(i, j)
+        if field == NULL:
             return None
         else:
-            return cell
+            return field.s[:field.length]
 
     def get_row(self, row_id):
         row = []
@@ -67,7 +71,8 @@ def create_array(chunks):
     unclosed_row = None
     unclosed_col = None
     incomplete_cell = None
-    for chunk in chunks:
+    while chunks:
+        chunk = chunks.popleft()
         I = chunk.nb_rows()
         J = chunk.nb_columns()
         start_row = 0
@@ -79,11 +84,12 @@ def create_array(chunks):
                 res[row_id, j] = v
         for i in range(start_row, I-1):
             for j in range(J):
-                cell = chunk.get(i, j)
-                res[row_id, j] = cell
+                field = chunk.get(i, j)
+                res[row_id, j] = field
             row_id += 1
         unclosed_row = chunk.get_row(I-1)
     return res
+
 
 cdef class CsvReader:
 
@@ -100,7 +106,7 @@ cdef class CsvReader:
 
     cdef _read(self, stream):
         i = 0
-        csv_chunks = []
+        csv_chunks = deque()
         while True:
             i+=1
             buff = stream.read(1000000)

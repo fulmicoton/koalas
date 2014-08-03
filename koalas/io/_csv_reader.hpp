@@ -8,7 +8,28 @@ namespace koalas {
 
 
 typedef Py_UNICODE CHAR;
-typedef std::vector<CHAR*> ROW;
+
+
+class _Field {
+public:
+    _Field(CHAR* s_)
+    :s(s_)
+    ,length(0) {}
+
+    _Field(CHAR* s_, int length_)
+    :s(s_)
+    ,length(length_) {}
+
+    _Field(const _Field& other)
+    :s(other.s)
+    ,length(other.length) {}
+
+    CHAR* s;
+    int length;   
+};
+
+
+typedef std::vector<_Field> ROW;
 
 
 class _CsvDialect {
@@ -37,21 +58,23 @@ private:
 
 
 
+
 class _CsvChunk {
 
 public:
     _CsvChunk(CHAR* buffer);
+    ~_CsvChunk();
     int nb_rows() const;
     int nb_columns() const;
-    const CHAR* get(int i, int j) const;
+    const _Field* get(int i, int j) const;
 
     void append_buffer(CHAR* buffer);
     void new_field();
     void new_row();
     void push(CHAR c);
+    void take(CHAR c);
     void error(const char* msg);
     void end();
-    void print() const;
 
 private:
     std::vector<CHAR*> _buffers;
@@ -59,8 +82,8 @@ private:
 
     CHAR* _buffer;
     CHAR* _last_CHAR;
-    CHAR* _current_token;
 
+    _Field _current_field;
     std::vector<ROW*> _rows;
     ROW* _current_row;
 };

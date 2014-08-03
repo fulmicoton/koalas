@@ -21,7 +21,8 @@ namespace koalas {
 _CsvChunk::_CsvChunk(CHAR* buffer_)
 :_buffer(buffer_)
 ,_last_CHAR(buffer_)
-,_current_token(buffer_) {
+,_current_field(buffer_)
+{
     _current_row = new ROW();
 }
 
@@ -35,9 +36,8 @@ _CsvChunk::~_CsvChunk() {
 }
 
 void _CsvChunk::new_field() {
-    _current_row->push_back(_current_token);
-    push('\0');
-    _current_token = _last_CHAR;
+    _current_row->push_back(_current_field);
+    _current_field = _Field(_last_CHAR, 0);
 }
 
 void _CsvChunk::new_row() {
@@ -48,7 +48,13 @@ void _CsvChunk::new_row() {
 void _CsvChunk::push(CHAR c) {
     *_last_CHAR = c;
     _last_CHAR++;
+    _current_field.length++;
 }
+
+void _CsvChunk::take(CHAR c) {
+    _current_field.length++;
+}
+
 
 void _CsvChunk::end() {
     if (_current_row != _current_row) {
@@ -60,30 +66,13 @@ void _CsvChunk::error(const char* msg) {
     cerr << "Error:" << msg << endl;
 }
 
-
-const CHAR* _CsvChunk::get(int i, int j) const {
+const _Field* _CsvChunk::get(int i, int j) const {
     const ROW* row = _rows[i];
     if (j < row->size()) {
-        return (*row)[j];
+        return &(*row)[j];
     }
     else {
         return NULL;
-    }
-}
-
-void _CsvChunk::print() const {
-    cout << "Tokenizer"<< endl;
-    cout << _rows.size() << " rows" << endl;
-    vector<ROW*>::const_iterator row_it;
-    int row_id = 0;
-    for (row_it = _rows.begin(); row_it!=_rows.end(); ++row_it) {
-        const ROW& row = **row_it;
-        cout << "ROW:" << row_id << endl;
-        vector<CHAR*>::const_iterator field_it = row.begin();
-        for (; field_it != row.end(); field_it++) {
-            cout << "   " << *field_it << endl;
-        }
-        row_id +=1;
     }
 }
 
@@ -143,7 +132,6 @@ _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int remaining_length) {
             case QUOTED:
                 state.error("not suporting quote yet"); // TODO
                 return csv_data;
-
             case UNQUOTED:
                 if (c == _dialect.quote()) {
                     // ERROR
@@ -159,7 +147,7 @@ _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int remaining_length) {
                     _state = START_FIELD;
                 }
                 else {
-                    state.push(c);
+                    state.take(c);
                 }
                 break;
         }
