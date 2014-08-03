@@ -65,7 +65,7 @@ cdef class CsvChunk:
 def create_array(chunks):
     nb_cols = max(chunk.nb_columns() for chunk in chunks)
     nb_rows = sum(chunk.nb_rows() for chunk in chunks) - len(chunks) + 1
-    res = np.zeros((nb_rows, nb_cols), dtype=np.object)
+    res = np.empty((nb_rows, nb_cols), dtype=np.object)
     row_id = 0
     col_id = 0
     unclosed_row = None
@@ -119,5 +119,3 @@ cdef class CsvReader:
             csv_chunks.append(csv_chunk)
         return create_array(csv_chunks)
 
-    def __dealloc__(self):
-        del self.csv_reader

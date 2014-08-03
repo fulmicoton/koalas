@@ -97,19 +97,17 @@ _CsvReader::_CsvReader()
 }
 
 
-
-
 _CsvReader::_CsvReader(const _CsvDialect& dialect_)
 :_dialect(dialect_) {}
 
 
 _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int remaining_length) {
     _CsvChunk* csv_data = new _CsvChunk(data);
-    _CsvChunk& state = *csv_data;
+    _CsvChunk& chunk = *csv_data;
     for (int i=0; i<remaining_length; i++) {
         CHAR c = *data;
         if (c== '\0') {
-            state.end();
+            chunk.end();
             return csv_data;
         }
         switch (_state) {
@@ -118,36 +116,60 @@ _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int remaining_length) {
                     _state = QUOTED;
                 }
                 else if (c == _dialect.separator()) {
-                    state.new_field();
+                    chunk.new_field();
                 }
                 else if (c == _dialect.carret()) {
-                    state.new_field();
-                    state.new_row();
+                    chunk.new_field();
+                    chunk.new_row();
                 }
                 else {
-                    state.push(c);
+                    chunk.push(c);
                     _state = UNQUOTED;
                 }
                 break;
             case QUOTED:
-                state.error("not suporting quote yet"); // TODO
-                return csv_data;
+                if (c == '\0') {
+                    chunk.error("EOF reach from within quoted field");
+                }
+                else if (c == _dialect.quote()) {
+                    data++;
+                    c = *data;
+                    if (c == _dialect.quote()) {
+                        chunk.push(_dialect.quote());
+                    }
+                    else if (c == _dialect.separator()) {
+                        chunk.new_field();
+                        _state = START_FIELD;
+                    }
+                    else if (c == _dialect.carret()) {
+                        chunk.new_field();
+                        chunk.new_row();
+                        _state = START_FIELD;
+                    }
+                    else {
+                        chunk.error("Forbidden CHAR after \" in quoted field"); // TODO specify CHAR
+                    }
+                }
+                else {
+                    chunk.push(c);
+                }
+                break;
             case UNQUOTED:
                 if (c == _dialect.quote()) {
                     // ERROR
-                    state.error("Quotation mark within unquoted field forbidden");
+                    chunk.error("Quotation mark within unquoted field forbidden");
                 }
                 else if (c == _dialect.separator()) {
-                    state.new_field();
+                    chunk.new_field();
                     _state = START_FIELD;
                 }
                 else if (c == _dialect.carret()) {
-                    state.new_field();
-                    state.new_row();
+                    chunk.new_field();
+                    chunk.new_row();
                     _state = START_FIELD;
                 }
                 else {
-                    state.take(c);
+                    chunk.take(c);
                 }
                 break;
         }
@@ -155,64 +177,6 @@ _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int remaining_length) {
     }
     return csv_data;
 }
-
-
-// void _CsvReader::tokenize_start_field(_CsvChunk& state, const CHAR* data, const int remaining_length) const {
-//     CHAR c = *data;
-//     if (c == '\0') {
-//         state.end();
-//     }
-//     else if (c == _dialect.quote()) {
-//         tokenize_quoted(state, ++data, remaining_length-1);
-//     }
-//     else if (c == _dialect.separator()) {
-//         state.new_field();
-//         tokenize_start_field(state, ++data, remaining_length-1);
-//     }
-//     else if (c == _dialect.carret()) {
-//         state.new_field();
-//         state.new_row();
-//         tokenize_start_field(state, ++data, remaining_length-1);
-//     }
-//     else {
-//         state.push(c);
-//         tokenize_unquoted(state, ++data, remaining_length-1);
-//     }
-// }
-
-
-// void _CsvReader::tokenize_quoted(_CsvChunk& state, const CHAR* data, int remaining_length) const {
-//     CHAR c = *data;
-//     if (c == '\0') {
-//         state.error("EOF reach from within quoted field");
-//     }
-//     else if (c == _dialect.quote()) {
-//         data++;
-//         c = *data;
-//         if (c == _dialect.quote()) {
-//             state.push(_dialect.quote());
-//             tokenize_quoted(state, ++data, remaining_length-1);
-//         }
-//         else if (c == _dialect.separator()) {
-//             state.new_field();
-//             tokenize_start_field(state, ++data, remaining_length-1);
-//         }
-//         else if (c == _dialect.carret()) {
-//             state.new_field();
-//             state.new_row();
-//             tokenize_start_field(state, ++data, remaining_length-1);
-//         }
-//         else {
-//             state.error("Forbidden CHAR after \" in quoted field"); // TODO specify CHAR
-//         }
-//     }
-//     else {
-//         state.push(c);
-//         tokenize_quoted(state, ++data, --remaining_length);
-//     }
-// }
-
-
 
 
 }
