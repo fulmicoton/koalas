@@ -1,7 +1,7 @@
 import csv
 import numpy as np
 from itertools import izip_longest, izip
-from frame import DataFrame
+from ..frame import DataFrame
 import re
 
 NB_GUESS_LINES = 1000

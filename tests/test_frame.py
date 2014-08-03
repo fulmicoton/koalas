@@ -31,3 +31,11 @@ def test_import_csv():
     df = io.from_csv(open_resource('test.csv'))
     print df.dtypes
     assert df.dtypes == (np.int, np.float, np.object)
+
+
+
+#print _csv.from_file(f, 10)
+
+#print dir(_csv)
+#print _csv.test_a(f)
+#print dir(_csv)

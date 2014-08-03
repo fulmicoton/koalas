@@ -52,3 +52,7 @@ coverage.xml
 # Sphinx documentation
 docs/_build/
 
+
+# cython output
+koalas/io/csv_reader.c
+koalas/io/csv_reader.cpp
