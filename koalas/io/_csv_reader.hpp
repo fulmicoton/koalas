@@ -32,23 +32,33 @@ public:
 typedef std::vector<_Field> ROW;
 
 class _CsvDialect {
+
 public:
-    static _CsvDialect rfc4180() {
-        return _CsvDialect(';', '\"');
+    _CsvDialect()
+    :_separator(',')
+    ,_quote('"') {}
+
+    void set_quote(CHAR quote) {
+        _quote = quote;
+    };
+
+    void set_separator(CHAR separator) {
+        _separator = separator;
     }
-    _CsvDialect(CHAR separator_, CHAR quote_)
-    :_separator(separator_)
-    ,_quote(quote_) {};
+
     inline CHAR separator() const {
         return _separator;
     };
+
     inline CHAR quote() const { 
         return _quote;
     };
+
 private:
     CHAR _separator;
     CHAR _quote;
 };
+
 
 
 class _CsvChunk {
@@ -91,8 +101,7 @@ enum _CsvReaderState {
 
 class _CsvReader {
 public:
-    _CsvReader();
-    _CsvReader(const _CsvDialect& dialect_);
+    _CsvReader(const _CsvDialect* dialect_);
     _CsvChunk* read_chunk(CHAR* buffer, const int buffer_length);
 private:
     _CsvReaderState _state;

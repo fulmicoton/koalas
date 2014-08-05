@@ -3,9 +3,10 @@
 from koalas.io import csv_reader
 import time
 import pandas
-import sys
 
-reader = csv_reader.CsvReader()
+dialect = csv_reader.CsvDialect()
+dialect.set_separator(";")
+reader = csv_reader.CsvReader(dialect)
 
 
 def test_koalas_csv():
@@ -13,13 +14,9 @@ def test_koalas_csv():
     with codecs.open("test.csv", "r", "utf-8") as f:
         a = time.time()
         m = reader.read(f)
-        #print "df", sys.getsizeof(m)
-        #print m[:3,:3]
-        #print m.shape
+        print m[-100:]
         b = time.time()
         print "time", b - a
-        #data = f.read()[:4000000]
-        #csv_reader.tokenize_str(data)
 
 
 def test_pandas_csv():
@@ -33,16 +30,7 @@ def test_pandas_csv():
 if __name__ == '__main__':
     #while True:
     #    c = test_koalas_csv()
-    
-    test_pandas_csv()
     test_koalas_csv()
-    test_pandas_csv()
-    test_koalas_csv()
-    test_pandas_csv()
-    test_koalas_csv()
-    test_pandas_csv()
-    test_koalas_csv()
-    test_pandas_csv()
     
     #import timeit
     #print(timeit.timeit("test_koalas()", number=1, setup="from __main__ import test_koalas"))

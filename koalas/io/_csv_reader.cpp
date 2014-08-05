@@ -85,15 +85,9 @@ int _CsvChunk::nb_columns() const {
     return nb_cols;    
 }
 
-_CsvReader::_CsvReader()
+_CsvReader::_CsvReader(const _CsvDialect* dialect_)
 :_state(START_FIELD)
-,_dialect(_CsvDialect::rfc4180())
-{
-}
-
-
-_CsvReader::_CsvReader(const _CsvDialect& dialect_)
-:_dialect(dialect_) {}
+,_dialect(*dialect_) {}
 
 
 

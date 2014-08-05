@@ -14,7 +14,7 @@ cdef extern from "_csv_reader.hpp" namespace "koalas":
         int length
 
     cdef cppclass _CsvReader:
-        _CsvReader() except + 
+        _CsvReader(const _CsvDialect* dialect_) except +
         _CsvChunk* read_chunk(Py_UNICODE* buff, const int buffer_length)
 
     cdef cppclass _CsvChunk:
@@ -22,6 +22,40 @@ cdef extern from "_csv_reader.hpp" namespace "koalas":
         const _Field* get(int i, int j) const
         int nb_rows() const
         int nb_columns() const
+
+    cdef cppclass _CsvDialect:
+        _CsvDialect() except +
+        void set_quote(Py_UNICODE quote)
+        void set_separator(Py_UNICODE separator)
+
+
+
+cdef class CsvDialect:
+
+    cdef _CsvDialect* _csv_dialect
+
+    def __cinit__(self,):
+        self._csv_dialect = new _CsvDialect()
+
+    cdef _CsvDialect* get_csv_dialect(self,):
+        return self._csv_dialect
+
+    cdef void _set_quote(self, Py_UNICODE quote):
+        self._csv_dialect.set_quote(quote)
+
+    cdef void _set_separator(self, Py_UNICODE separator):
+        self._csv_dialect.set_separator(separator)
+
+    def set_quote(self, quote_char):
+        if len(quote_char) != 1:
+            raise ValueError("Quote char must be a single char.")
+        self._set_quote(ord(quote_char[0]))
+
+    def set_separator(self, separator_char):
+        if len(separator_char) != 1:
+            raise ValueError("Separator char must be a single char.")
+        self._set_separator(ord(separator_char[0]))
+
 
 
 cdef class CsvChunk:
@@ -82,6 +116,7 @@ def create_array(chunks):
             row = (unclosed_row[:-1] + [unclosed_row[-1] + first_row[0]] + first_row[1:])[:J]
             for (j, v)  in enumerate(row):
                 res[row_id, j] = v
+            row_id += 1
         last_row = I - (1 if chunks else 0)
         for i in range(start_row, last_row):
             for j in range(J):
@@ -95,9 +130,10 @@ def create_array(chunks):
 cdef class CsvReader:
 
     cdef _CsvReader * csv_reader
-
-    def __cinit__(self,):
-        self.csv_reader = new _CsvReader()
+            
+    def __cinit__(self, CsvDialect csv_dialect):
+        cdef _CsvDialect * _csv_dialect = csv_dialect.get_csv_dialect()
+        self.csv_reader = new _CsvReader(_csv_dialect)
 
     def __dealloc__(self):
         del self.csv_reader
