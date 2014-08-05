@@ -82,7 +82,8 @@ def create_array(chunks):
             row = (unclosed_row[:-1] + [unclosed_row[-1] + first_row[0]] + first_row[1:])[:J]
             for (j, v)  in enumerate(row):
                 res[row_id, j] = v
-        for i in range(start_row, I-1):
+        last_row = I - (1 if chunks else 0)
+        for i in range(start_row, last_row):
             for j in range(J):
                 field = chunk.get(i, j)
                 res[row_id, j] = field

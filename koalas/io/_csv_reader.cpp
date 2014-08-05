@@ -51,11 +51,6 @@ void _CsvChunk::push(CHAR c) {
     _current_field.length++;
 }
 
-void _CsvChunk::take(CHAR c) {
-    _current_field.length++;
-}
-
-
 void _CsvChunk::end() {
     if (_current_row != _current_row) {
         new_row();
@@ -101,81 +96,113 @@ _CsvReader::_CsvReader(const _CsvDialect& dialect_)
 :_dialect(dialect_) {}
 
 
-_CsvChunk* _CsvReader::read_chunk(CHAR* data, const int remaining_length) {
-    _CsvChunk* csv_data = new _CsvChunk(data);
-    _CsvChunk& chunk = *csv_data;
-    for (int i=0; i<remaining_length; i++) {
-        CHAR c = *data;
-        if (c== '\0') {
-            chunk.end();
-            return csv_data;
+
+struct Cursor {
+    Cursor(CHAR* buffer, int length_)
+    :cursor(buffer)
+    ,length(length_)
+    ,offset(0) {
+        // token = *cursor;
+    }
+
+    CHAR token;
+    CHAR* cursor;
+    int length;
+    int offset;
+  
+    bool next() {
+        if (offset < length) {
+            token = *cursor;
+            offset++;
+            cursor++;
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+};
+
+
+static const int CR = '\r';
+static const int LF = '\n';
+
+_CsvChunk* _CsvReader::read_chunk(CHAR* data, const int length) {
+    _CsvChunk* chunk = new _CsvChunk(data);
+   
+    Cursor cursor = Cursor(data, length);
+    while (cursor.next()) {
+        if (cursor.token == CR) {
+            // getting rid of all \r
+            // \r alone will not be interpreted as
+            // a carriage return
+            continue;
         }
         switch (_state) {
             case START_FIELD:
-                if (c == _dialect.quote()) {
+
+                if (cursor.token == _dialect.quote()) {
                     _state = QUOTED;
                 }
-                else if (c == _dialect.separator()) {
-                    chunk.new_field();
+                else if (cursor.token == _dialect.separator()) {
+                    chunk->new_field();
                 }
-                else if (c == _dialect.carret()) {
-                    chunk.new_field();
-                    chunk.new_row();
+                else if (cursor.token == LF) {
+                    chunk->new_field();
+                    chunk->new_row();
                 }
                 else {
-                    chunk.push(c);
+                    chunk->push(cursor.token);
                     _state = UNQUOTED;
                 }
                 break;
-            case QUOTED:
-                if (c == '\0') {
-                    chunk.error("EOF reach from within quoted field");
+            case QUOTE_IN_QUOTED:
+                if (cursor.token == _dialect.quote()) {
+                    chunk->push(_dialect.quote());
+                    _state = QUOTED;
                 }
-                else if (c == _dialect.quote()) {
-                    data++;
-                    c = *data;
-                    if (c == _dialect.quote()) {
-                        chunk.push(_dialect.quote());
-                    }
-                    else if (c == _dialect.separator()) {
-                        chunk.new_field();
-                        _state = START_FIELD;
-                    }
-                    else if (c == _dialect.carret()) {
-                        chunk.new_field();
-                        chunk.new_row();
-                        _state = START_FIELD;
-                    }
-                    else {
-                        chunk.error("Forbidden CHAR after \" in quoted field"); // TODO specify CHAR
-                    }
+                else if (cursor.token == _dialect.separator()) {
+                    chunk->new_field();
+                    _state = START_FIELD;
+                }
+                else if (cursor.token == LF) {
+                    chunk->new_field();
+                    chunk->new_row();
+                    _state = START_FIELD;
                 }
                 else {
-                    chunk.push(c);
+                    chunk->error("Forbidden CHAR after \" in quoted field"); // TODO specify CHAR
+                }
+                break;
+            case QUOTED:
+                if (cursor.token == _dialect.quote()) {
+                    _state = QUOTE_IN_QUOTED;
+                }
+                else {
+                    chunk->push(cursor.token);
                 }
                 break;
             case UNQUOTED:
-                if (c == _dialect.quote()) {
+                if (cursor.token == _dialect.quote()) {
                     // ERROR
-                    chunk.error("Quotation mark within unquoted field forbidden");
+                    chunk->error("Quotation mark within unquoted field forbidden");
                 }
-                else if (c == _dialect.separator()) {
-                    chunk.new_field();
+                else if (cursor.token == _dialect.separator()) {
+                    chunk->new_field();
                     _state = START_FIELD;
                 }
-                else if (c == _dialect.carret()) {
-                    chunk.new_field();
-                    chunk.new_row();
+                else if (cursor.token == LF) {
+                    chunk->new_field();
+                    chunk->new_row();
                     _state = START_FIELD;
                 }
                 else {
-                    chunk.take(c);
+                    chunk->push(cursor.token);
                 }
                 break;
         }
-        data++;
     }
-    return csv_data;
+    return chunk;
 }
 
 
