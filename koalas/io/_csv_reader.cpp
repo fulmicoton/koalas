@@ -11,58 +11,51 @@ using namespace std;
 namespace koalas {
 
 
-
-
-////////////////////////////////////////////////////
-// rfc4180
-
-
-
 _CsvChunk::_CsvChunk(CHAR* buffer_)
-:_buffer(buffer_)
-,_last_CHAR(buffer_)
-,_current_field(buffer_)
+:last_CHAR(buffer_)
+,buffer(buffer_)
+,current_field(buffer_)
 {
-    _current_row = new ROW();
+    current_row = new ROW();
 }
 
 
 _CsvChunk::~_CsvChunk() {
-    delete _current_row;
+    delete current_row;
     vector<ROW*>::const_iterator row_it;
-    for (row_it = _rows.begin(); row_it!=_rows.end(); ++row_it) {
+    for (row_it = rows.begin();
+         row_it != rows.end();
+         ++row_it) {
         delete *row_it;
     }
 }
 
 void _CsvChunk::new_field() {
-    _current_row->push_back(_current_field);
-    _current_field = _Field(_last_CHAR, 0);
+    current_row->push_back(current_field);
+    current_field = _Field(last_CHAR, 0);
 }
 
 void _CsvChunk::new_row() {
-    _rows.push_back(_current_row);
-    _current_row = new ROW();
+    rows.push_back(current_row);
+    current_row = new ROW();
 }
 
 void _CsvChunk::push(CHAR c) {
-    *_last_CHAR = c;
-    _last_CHAR++;
-    _current_field.length++;
+    *last_CHAR = c;
+    last_CHAR++;
+    current_field.length++;
 }
 
 void _CsvChunk::end() {
-    if (_current_row != _current_row) {
-        new_row();
-    }
+    // TODO
 }
 
-void _CsvChunk::error(const char* msg) {
-    cerr << "Error:" << msg << endl;
+void _CsvChunk::set_error(const string&  error_msg_) {
+     error_msg = error_msg_;
 }
 
 const _Field* _CsvChunk::get(int i, int j) const {
-    const ROW* row = _rows[i];
+    const ROW* row = rows[i];
     if (j < row->size()) {
         return &(*row)[j];
     }
@@ -72,22 +65,24 @@ const _Field* _CsvChunk::get(int i, int j) const {
 }
 
 int _CsvChunk::nb_rows() const {
-    return _rows.size();
+    return rows.size();
 }
 
 int _CsvChunk::nb_columns() const {
     int nb_cols = 0;
     vector<ROW*>::const_iterator row_it;
-    for (row_it = _rows.begin(); row_it != _rows.end(); ++row_it) {
+    for (row_it = rows.begin();
+         row_it != rows.end();
+         ++row_it) {
         const int cur_row = (*row_it) -> size();
-        nb_cols = cur_row>nb_cols ? cur_row : nb_cols;
+        nb_cols = cur_row > nb_cols ? cur_row : nb_cols;
     }
     return nb_cols;    
 }
 
 _CsvReader::_CsvReader(const _CsvDialect* dialect_)
-:_state(START_FIELD)
-,_dialect(*dialect_) {}
+:state(START_FIELD)
+,dialect(*dialect_) {}
 
 
 
@@ -122,6 +117,10 @@ static const int CR = '\r';
 static const int LF = '\n';
 
 _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int length) {
+    if (PyString_CHECK_INTERNED(data)) {
+        // WE NEED TO COPY THE BUFFER BEFORE WORKING
+    }
+
     _CsvChunk* chunk = new _CsvChunk(data);
    
     Cursor cursor = Cursor(data, length);
@@ -132,13 +131,13 @@ _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int length) {
             // a carriage return
             continue;
         }
-        switch (_state) {
+        switch (state) {
             case START_FIELD:
 
-                if (cursor.token == _dialect.quote()) {
-                    _state = QUOTED;
+                if (cursor.token == dialect.quotechar) {
+                    state = QUOTED;
                 }
-                else if (cursor.token == _dialect.separator()) {
+                else if (cursor.token == dialect.delimiter) {
                     chunk->new_field();
                 }
                 else if (cursor.token == LF) {
@@ -147,48 +146,48 @@ _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int length) {
                 }
                 else {
                     chunk->push(cursor.token);
-                    _state = UNQUOTED;
+                    state = UNQUOTED;
                 }
                 break;
             case QUOTE_IN_QUOTED:
-                if (cursor.token == _dialect.quote()) {
-                    chunk->push(_dialect.quote());
-                    _state = QUOTED;
+                if (cursor.token == dialect.quotechar) {
+                    chunk->push(dialect.quotechar);
+                    state = QUOTED;
                 }
-                else if (cursor.token == _dialect.separator()) {
+                else if (cursor.token == dialect.delimiter) {
                     chunk->new_field();
-                    _state = START_FIELD;
+                    state = START_FIELD;
                 }
                 else if (cursor.token == LF) {
                     chunk->new_field();
                     chunk->new_row();
-                    _state = START_FIELD;
+                    state = START_FIELD;
                 }
                 else {
-                    chunk->error("Forbidden CHAR after \" in quoted field"); // TODO specify CHAR
+                    chunk->set_error("Forbidden CHAR after \" in quoted field"); // TODO specify CHAR
                 }
                 break;
             case QUOTED:
-                if (cursor.token == _dialect.quote()) {
-                    _state = QUOTE_IN_QUOTED;
+                if (cursor.token == dialect.quotechar) {
+                    state = QUOTE_IN_QUOTED;
                 }
                 else {
                     chunk->push(cursor.token);
                 }
                 break;
             case UNQUOTED:
-                if (cursor.token == _dialect.quote()) {
+                if (cursor.token == dialect.quotechar) {
                     // ERROR
-                    chunk->error("Quotation mark within unquoted field forbidden");
+                    chunk->set_error("Quotation mark within unquoted field forbidden");
                 }
-                else if (cursor.token == _dialect.separator()) {
+                else if (cursor.token == dialect.delimiter) {
                     chunk->new_field();
-                    _state = START_FIELD;
+                    state = START_FIELD;
                 }
                 else if (cursor.token == LF) {
                     chunk->new_field();
                     chunk->new_row();
-                    _state = START_FIELD;
+                    state = START_FIELD;
                 }
                 else {
                     chunk->push(cursor.token);

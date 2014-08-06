@@ -5,7 +5,7 @@ import time
 import pandas
 
 dialect = csv_reader.CsvDialect()
-dialect.set_separator(";")
+dialect.set_delimiter(";")
 reader = csv_reader.CsvReader(dialect)
 
 

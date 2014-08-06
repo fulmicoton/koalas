@@ -5,6 +5,7 @@ import numpy as np
 cimport numpy as np
 from cpython.ref cimport PyObject, Py_INCREF, Py_DECREF
 from collections import deque
+from libcpp cimport bool
 
 
 cdef extern from "_csv_reader.hpp" namespace "koalas":
@@ -25,8 +26,13 @@ cdef extern from "_csv_reader.hpp" namespace "koalas":
 
     cdef cppclass _CsvDialect:
         _CsvDialect() except +
-        void set_quote(Py_UNICODE quote)
-        void set_separator(Py_UNICODE separator)
+        Py_UNICODE delimiter
+        Py_UNICODE quotechar
+        Py_UNICODE escapechar
+        bool doublequote
+        # bool skipinitialspace;
+        # LINE_TERMINATOR lineterminator;
+        # QUOTING quoting;
 
 
 
@@ -40,21 +46,21 @@ cdef class CsvDialect:
     cdef _CsvDialect* get_csv_dialect(self,):
         return self._csv_dialect
 
-    cdef void _set_quote(self, Py_UNICODE quote):
-        self._csv_dialect.set_quote(quote)
+    cdef void _set_quotechar(self, Py_UNICODE quotechar):
+        self._csv_dialect.quotechar = quotechar
 
-    cdef void _set_separator(self, Py_UNICODE separator):
-        self._csv_dialect.set_separator(separator)
+    cdef void _set_delimiter(self, Py_UNICODE delimiter):
+        self._csv_dialect.delimiter = delimiter
 
-    def set_quote(self, quote_char):
-        if len(quote_char) != 1:
+    def set_quotechar(self, quotechar):
+        if len(quotechar) != 1:
             raise ValueError("Quote char must be a single char.")
-        self._set_quote(ord(quote_char[0]))
+        self._set_quotechar(ord(quotechar[0]))
 
-    def set_separator(self, separator_char):
-        if len(separator_char) != 1:
+    def set_delimiter(self, delimiter):
+        if len(delimiter) != 1:
             raise ValueError("Separator char must be a single char.")
-        self._set_separator(ord(separator_char[0]))
+        self._set_delimiter(ord(delimiter[0]))
 
 
 
@@ -95,6 +101,11 @@ cdef class CsvChunk:
 
     def nb_columns(self,):
         return self._csv_chunk.nb_columns()
+
+
+# PyString_InternInPlace
+# PyString_CHECK_INTERNED
+
 
 def create_array(chunks):
     nb_cols = max(chunk.nb_columns() for chunk in chunks)
@@ -146,6 +157,9 @@ cdef class CsvReader:
         csv_chunks = deque()
         while True:
             i+=1
+            # TODO if buff is small it might be internet
+            # modifying its underlying buffer in place
+            # could be catastrophic.
             buff = stream.read(1000000)
             assert isinstance(buff, unicode)
             buff_length = len(buff)

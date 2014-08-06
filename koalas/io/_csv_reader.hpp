@@ -3,6 +3,7 @@
 
 #include <Python.h>
 #include <vector>
+#include <string>
 
 namespace koalas {
 
@@ -29,35 +30,46 @@ public:
 };
 
 
+
 typedef std::vector<_Field> ROW;
 
-class _CsvDialect {
 
+// --------------------------
+// PEP 0305
+//
+// http://legacy.python.org/dev/peps/pep-0305/
+
+enum LINE_TERMINATOR {
+    LF_TERMINATOR,    // \n     UNIX STYLE
+    CRLF_TERMINATOR   // \r\n   WINDOWS STYLE
+};
+
+enum QUOTING {
+    QUOTE_MINIMAL,
+    QUOTE_ALL,
+    QUOTE_NONNUMERIC,
+    QUOTE_NONE
+};
+
+struct _CsvDialect {
 public:
     _CsvDialect()
-    :_separator(',')
-    ,_quote('"') {}
+    :delimiter(',')
+    ,quotechar('"')
+    ,escapechar('\\')
+    ,doublequote(true)
+    ,lineterminator(LF_TERMINATOR)
+    ,quoting(QUOTE_MINIMAL) {}
 
-    void set_quote(CHAR quote) {
-        _quote = quote;
-    };
-
-    void set_separator(CHAR separator) {
-        _separator = separator;
-    }
-
-    inline CHAR separator() const {
-        return _separator;
-    };
-
-    inline CHAR quote() const { 
-        return _quote;
-    };
-
-private:
-    CHAR _separator;
-    CHAR _quote;
+    CHAR delimiter;
+    CHAR quotechar;
+    CHAR escapechar;
+    bool doublequote;
+    // bool skipinitialspace;
+    LINE_TERMINATOR lineterminator;
+    QUOTING quoting;
 };
+
 
 
 
@@ -74,17 +86,16 @@ public:
     void new_field();
     void new_row();
     void push(CHAR c);
-    void error(const char* msg);
+    void set_error(const std::string&);
     void end();
-    CHAR* _last_CHAR;
-
 private:
-    std::vector<CHAR*> _buffers;
-    CHAR* _buffer;
-
-    _Field _current_field;
-    std::vector<ROW*> _rows;
-    ROW* _current_row;
+    std::string error_msg;
+    CHAR* last_CHAR;
+    std::vector<CHAR*> buffers;
+    CHAR* buffer;
+    _Field current_field;
+    std::vector<ROW*> rows;
+    ROW* current_row;
 };
 
 
@@ -104,8 +115,8 @@ public:
     _CsvReader(const _CsvDialect* dialect_);
     _CsvChunk* read_chunk(CHAR* buffer, const int buffer_length);
 private:
-    _CsvReaderState _state;
-    const _CsvDialect _dialect;
+    _CsvReaderState state;
+    const _CsvDialect dialect;
 };
 
 }
