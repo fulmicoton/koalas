@@ -6,7 +6,7 @@ cimport numpy as np
 from cpython.ref cimport PyObject, Py_INCREF, Py_DECREF
 from collections import deque
 from libcpp cimport bool
-
+import json
 
 cdef extern from "_csv_reader.hpp" namespace "koalas":
 
@@ -40,28 +40,57 @@ cdef class CsvDialect:
 
     cdef _CsvDialect* _csv_dialect
 
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
     def __cinit__(self,):
         self._csv_dialect = new _CsvDialect()
 
     cdef _CsvDialect* get_csv_dialect(self,):
         return self._csv_dialect
 
-    cdef void _set_quotechar(self, Py_UNICODE quotechar):
-        self._csv_dialect.quotechar = quotechar
+    property quotechar:
+        
+        def __get__(self,):
+            return self._csv_dialect.quotechar
 
-    cdef void _set_delimiter(self, Py_UNICODE delimiter):
-        self._csv_dialect.delimiter = delimiter
+        def __set__(self, quotechar):
+            if len(quotechar) != 1:
+                raise ValueError("Quote char must be a single char.")
+            self._csv_dialect.quotechar = ord(quotechar[0])
 
-    def set_quotechar(self, quotechar):
-        if len(quotechar) != 1:
-            raise ValueError("Quote char must be a single char.")
-        self._set_quotechar(ord(quotechar[0]))
+    property delimiter:
 
-    def set_delimiter(self, delimiter):
-        if len(delimiter) != 1:
-            raise ValueError("Separator char must be a single char.")
-        self._set_delimiter(ord(delimiter[0]))
+        def __get__(self,):
+            return self._csv_dialect.delimiter
 
+        def __set__(self, delimiter):
+            if len(delimiter) != 1:
+                raise ValueError("Separator char must be a single char.")
+            self._csv_dialect.delimiter = ord(delimiter[0])
+
+    property escapechar:
+
+        def __get__(self,):
+            return self._csv_dialect.escapechar
+
+        def __set__(self, escapechar):
+            if len(escapechar) != 1:
+                raise ValueError("Separator char must be a single char.")
+            self._csv_dialect.escapechar = ord(escapechar[0])
+
+    property doublequote:
+
+        def __get__(self,):
+            return self._csv_dialect.doublequote
+
+        def __set__(self, doublequote):
+            self._csv_dialect.doublequote = doublequote
+
+    def __repr__(self,):
+        return """CsvDialect(quotechar=%s,delimiter=%s,escapechar=%s,doublequote=%s)""" %\
+            tuple(map(json.dumps, [self.quotechar, self.delimiter, self.escapechar, self.doublequote]))
 
 
 cdef class CsvChunk:

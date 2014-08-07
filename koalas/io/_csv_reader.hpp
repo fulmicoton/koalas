@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 
+
 namespace koalas {
 
 
@@ -69,7 +70,6 @@ public:
     LINE_TERMINATOR lineterminator;
     QUOTING quoting;
 };
-
 
 
 

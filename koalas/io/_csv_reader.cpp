@@ -133,7 +133,6 @@ _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int length) {
         }
         switch (state) {
             case START_FIELD:
-
                 if (cursor.token == dialect.quotechar) {
                     state = QUOTED;
                 }
