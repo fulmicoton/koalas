@@ -88,12 +88,13 @@ public:
     void push(CHAR c);
     void set_error(const std::string&);
     void end_of_chunk();
-private:
     std::string error_msg;
+
+private:
     CHAR* last_CHAR;
     std::vector<CHAR*> buffers;
     CHAR* buffer;
-    _Field current_field;
+    _Field* current_field;
     std::vector<ROW*> rows;
     ROW* current_row;
 };
@@ -101,6 +102,7 @@ private:
 
 enum _CsvReaderState {
     START_FIELD,
+    START_ROW,
     QUOTED,
     UNQUOTED,
     QUOTE_IN_QUOTED

@@ -13,17 +13,16 @@ namespace koalas {
 
 _CsvChunk::_CsvChunk(CHAR* buffer_, int length)
 :last_CHAR(buffer_)
-,current_field(buffer_)
 {
     buffer = new CHAR[length];
     memcpy(buffer, buffer_, length * sizeof(CHAR));
     current_row = new ROW();
+    rows.push_back(current_row);
 }
 
 
 _CsvChunk::~_CsvChunk() {
     delete buffer;
-    delete current_row;
     vector<ROW*>::const_iterator row_it;
     for (row_it = rows.begin();
          row_it != rows.end();
@@ -33,27 +32,24 @@ _CsvChunk::~_CsvChunk() {
 }
 
 void _CsvChunk::new_field() {
-    current_row->push_back(current_field);
-    current_field = _Field(last_CHAR, 0);
+    current_row->push_back(_Field(last_CHAR, 0));
+    current_field = &*(current_row->rbegin());
 }
 
 void _CsvChunk::new_row() {
-    rows.push_back(current_row);
     current_row = new ROW();
+    rows.push_back(current_row);
 }
 
 void _CsvChunk::push(CHAR c) {
     *last_CHAR = c;
     last_CHAR++;
-    current_field.length++;
+    current_field->length++;
 }
 
 void _CsvChunk::end_of_chunk() {
-    if (current_field.length > 0) {
-        new_field();
-    }
-    if (current_row->size() > 0) {
-        new_row();
+    if (current_row->size() == 0) {
+        rows.pop_back();
     }
 }
 
@@ -88,7 +84,7 @@ int _CsvChunk::nb_columns() const {
 }
 
 _CsvReader::_CsvReader(const _CsvDialect* dialect_)
-:state(START_FIELD)
+:state(START_ROW)
 ,dialect(*dialect_) {}
 
 
@@ -139,6 +135,24 @@ _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int length) {
             continue;
         }
         switch (state) {
+            case START_ROW:
+                if (cursor.token == dialect.quotechar) {
+                    chunk->new_field();
+                    state = QUOTED;
+                }
+                else if (cursor.token == dialect.delimiter) {
+                    chunk->new_field();
+                    state = START_FIELD;
+                }
+                else if (cursor.token == LF) {
+                    chunk->new_row();
+                }
+                else {
+                    chunk->new_field();
+                    chunk->push(cursor.token);
+                    state = UNQUOTED;
+                }
+                break;
             case START_FIELD:
                 if (cursor.token == dialect.quotechar) {
                     state = QUOTED;
@@ -147,8 +161,9 @@ _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int length) {
                     chunk->new_field();
                 }
                 else if (cursor.token == LF) {
-                    chunk->new_field();
                     chunk->new_row();
+                    chunk->new_field();
+                    state = START_ROW;
                 }
                 else {
                     chunk->push(cursor.token);
@@ -165,13 +180,14 @@ _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int length) {
                     state = START_FIELD;
                 }
                 else if (cursor.token == LF) {
-                    chunk->new_field();
                     chunk->new_row();
-                    state = START_FIELD;
+                    chunk->new_field();
+                    state = START_ROW;
                 }
                 else {
-                    chunk->set_error("Forbidden CHAR after \" in quoted field"); // TODO specify CHAR
-                    // TODO BREAK
+                    //chunk->push(dialect.quotechar);
+                    chunk->push(cursor.token);
+                    state = QUOTED;
                 }
                 break;
             case QUOTED:
@@ -183,19 +199,13 @@ _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int length) {
                 }
                 break;
             case UNQUOTED:
-                if (cursor.token == dialect.quotechar) {
-                    // ERROR
-                    chunk->set_error("Quotation mark within unquoted field forbidden");
-                    // TODO BREAK
-                }
-                else if (cursor.token == dialect.delimiter) {
+                if (cursor.token == dialect.delimiter) {
                     chunk->new_field();
                     state = START_FIELD;
                 }
                 else if (cursor.token == LF) {
-                    chunk->new_field();
                     chunk->new_row();
-                    state = START_FIELD;
+                    state = START_ROW;
                 }
                 else {
                     chunk->push(cursor.token);
@@ -206,6 +216,8 @@ _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int length) {
     chunk->end_of_chunk();
     return chunk;
 }
+
+
 
 
 }

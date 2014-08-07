@@ -6,6 +6,7 @@ cimport numpy as np
 from cpython.ref cimport PyObject, Py_INCREF, Py_DECREF
 from collections import deque
 from libcpp cimport bool
+from libcpp.string cimport string
 import json
 
 cdef extern from "_csv_reader.hpp" namespace "koalas":
@@ -22,6 +23,8 @@ cdef extern from "_csv_reader.hpp" namespace "koalas":
         const _Field* get(int i, int j) const
         int nb_rows() const
         int nb_columns() const
+        bool ok() const
+        string error_msg
 
     cdef cppclass _CsvDialect:
         _CsvDialect() except +
@@ -32,7 +35,6 @@ cdef extern from "_csv_reader.hpp" namespace "koalas":
         # bool skipinitialspace;
         # LINE_TERMINATOR lineterminator;
         # QUOTING quoting;
-
 
 
 cdef class CsvDialect:
@@ -126,6 +128,7 @@ cdef class CsvChunk:
 
 
 def create_array(chunks):
+    # return np.empty((0, 0), dtype=np.object)
     if not chunks:
         return np.empty((0, 0), dtype=np.object)
     nb_cols = max(chunk.nb_columns() for chunk in chunks)
@@ -193,7 +196,10 @@ cdef class CsvReader:
     cdef CsvChunk _read_chunk(self, buff, length):
         csv_chunk = CsvChunk()
         cdef _CsvChunk* _csv_chunk = self.csv_reader.read_chunk(buff, length)
+        error_msg = unicode(_csv_chunk.error_msg)
         csv_chunk._csv_chunk = _csv_chunk
+        if len(error_msg) > 0:
+            raise ValueError(error_msg)
         return csv_chunk
 
     def _iter_chunks(self, stream, buffer_size):
