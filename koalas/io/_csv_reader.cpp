@@ -11,16 +11,18 @@ using namespace std;
 namespace koalas {
 
 
-_CsvChunk::_CsvChunk(CHAR* buffer_)
+_CsvChunk::_CsvChunk(CHAR* buffer_, int length)
 :last_CHAR(buffer_)
-,buffer(buffer_)
 ,current_field(buffer_)
 {
+    buffer = new CHAR[length];
+    memcpy(buffer, buffer_, length * sizeof(CHAR));
     current_row = new ROW();
 }
 
 
 _CsvChunk::~_CsvChunk() {
+    delete buffer;
     delete current_row;
     vector<ROW*>::const_iterator row_it;
     for (row_it = rows.begin();
@@ -49,6 +51,8 @@ void _CsvChunk::push(CHAR c) {
 void _CsvChunk::end_of_chunk() {
     if (current_field.length > 0) {
         new_field();
+    }
+    if (current_row->size() > 0) {
         new_row();
     }
 }
@@ -124,7 +128,7 @@ _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int length) {
         // WE NEED TO COPY THE BUFFER BEFORE WORKING
     }
 
-    _CsvChunk* chunk = new _CsvChunk(data);
+    _CsvChunk* chunk = new _CsvChunk(data, length);
    
     Cursor cursor = Cursor(data, length);
     while (cursor.next()) {

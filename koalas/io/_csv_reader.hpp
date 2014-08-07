@@ -76,7 +76,7 @@ public:
 class _CsvChunk {
 
 public:
-    _CsvChunk(CHAR* buffer);
+    _CsvChunk(CHAR* buffer, int length);
     ~_CsvChunk();
     int nb_rows() const;
     int nb_columns() const;

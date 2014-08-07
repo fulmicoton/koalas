@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from koalas.io.csv_reader import CsvDialect, CsvReader
+from koalas.io.csv_reader import CsvDialect, reader
 import time
 import pandas
 import csv
@@ -10,11 +10,14 @@ from StringIO import StringIO
 
 
 """
-Known (and wanted discrepancy with csv).
+Known, and wanted discrepancy with csv).
 
 - return a matrix (doh)
 - returns unicode object
 
+
+Known bug 
+- interned string may mess up if chunk buffer is len 1
 """
 
 PARAMETERS = {
@@ -37,17 +40,24 @@ def parsed_csv(s, params):
     return list(reader)
 
 
+def copy_string(s):
+    DUMMY_STRING = u"jambon"
+    return (DUMMY_STRING + s)[len(DUMMY_STRING):]
+
+
 def parsed_koalas(s, params):
-    ss = StringIO(s)
+    ss = StringIO(copy_string(s))
     dialect = CsvDialect(**params)
-    csv_reader = CsvReader(dialect)
-    return csv_reader.read(ss)
+    csv_reader = reader(ss, dialect)
+    return csv_reader.read_all()
 
 
 TEST_STRINGS = [
     u"a,b,c",
     u"a,d,c\na,b,c\n",
     u"a,d,c\na,b,c\na",
+    u"a,d,c\na,b,c\na,",
+    u"",
 ]
 
 
@@ -55,7 +65,7 @@ def process_row(row):
     """ Remove trailing nones
     """
     row_it = iter(row)
-    yield row_it.next()
+    yield unicode(row_it.next())
     while True:
         field = row_it.next()
         if field is None:
@@ -74,8 +84,8 @@ def to_tuples(res):
 def run_test(test_string, parameter):
     res_csv = parsed_csv(test_string, parameter)
     res_koalas = parsed_koalas(test_string, parameter)
-    print to_tuples(res_csv)
-    print to_tuples(res_koalas)
+    print "csv", to_tuples(res_csv)
+    print "koalas", to_tuples(res_koalas)
     assert to_tuples(res_csv) == to_tuples(res_koalas)
 
 if __name__ == '__main__':
@@ -85,7 +95,7 @@ if __name__ == '__main__':
         for parameter in iter_csvcodec_params():
             print "--"
             print parameter
-            run_test("c" + test_string, parameter)
+            run_test(test_string, parameter)
     
     #import timeit
     #print(timeit.timeit("test_koalas()", number=1, setup="from __main__ import test_koalas"))

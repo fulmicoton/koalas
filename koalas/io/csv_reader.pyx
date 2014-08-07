@@ -19,7 +19,6 @@ cdef extern from "_csv_reader.hpp" namespace "koalas":
         _CsvChunk* read_chunk(Py_UNICODE* buff, const int buffer_length)
 
     cdef cppclass _CsvChunk:
-        _CsvChunk(int buffersize) except +
         const _Field* get(int i, int j) const
         int nb_rows() const
         int nb_columns() const
@@ -94,17 +93,11 @@ cdef class CsvDialect:
 
 
 cdef class CsvChunk:
-    
-    cdef _CsvChunk * _csv_chunk
 
-    cdef object _buff
+    cdef _CsvChunk* _csv_chunk
 
-    def __cinit__(self, _buff):
-        Py_INCREF(_buff)
-        self._buff = _buff
 
     def __dealloc__(self):
-        Py_DECREF(self._buff)
         del self._csv_chunk
 
     def get(self, int i, int j):
@@ -132,11 +125,9 @@ cdef class CsvChunk:
         return self._csv_chunk.nb_columns()
 
 
-# PyString_InternInPlace
-# PyString_CHECK_INTERNED
-
-
 def create_array(chunks):
+    if not chunks:
+        return np.empty((0, 0), dtype=np.object)
     nb_cols = max(chunk.nb_columns() for chunk in chunks)
     nb_rows = sum(chunk.nb_rows() for chunk in chunks) - len(chunks) + 1
     res = np.empty((nb_rows, nb_cols), dtype=np.object)
@@ -166,36 +157,55 @@ def create_array(chunks):
         unclosed_row = chunk.get_row(last_row-1)
     return res
 
+def reader(stream, csv_dialect, buffer_length=10000000):
+    return CsvReader(stream, csv_dialect, buffer_length)
 
 cdef class CsvReader:
 
+    cdef object stream
+    cdef object buffer_length
     cdef _CsvReader * csv_reader
-            
-    def __cinit__(self, CsvDialect csv_dialect):
+    
+    def __cinit__(self, stream, CsvDialect csv_dialect, *args, **kwargs):
         cdef _CsvDialect * _csv_dialect = csv_dialect.get_csv_dialect()
         self.csv_reader = new _CsvReader(_csv_dialect)
+
+    def __init__(self, stream, csv_dialect, buffer_length=10000000):
+        """
+        dialect --
+        stream -- a file-like object streaming unicode characters
+        """
+        self.stream = stream
+        self.buffer_length = buffer_length
 
     def __dealloc__(self):
         del self.csv_reader
 
-    def read(self, stream, buffer_size=1000000):
-        return self._read(stream, buffer_size)
+    def read_all(self,):
+        """ Read the csv in stream and returns a numpy array
+        containing unicode objects.
 
-    cdef _read(self, stream, buffer_size):
-        i = 0
-        csv_chunks = deque()
+        length -- the number of char handled per csv_chunk
+        """
+        csv_chunks = deque(self._iter_chunks(self.stream, self.buffer_length))
+        return create_array(csv_chunks)
+
+    cdef CsvChunk _read_chunk(self, buff, length):
+        csv_chunk = CsvChunk()
+        cdef _CsvChunk* _csv_chunk = self.csv_reader.read_chunk(buff, length)
+        csv_chunk._csv_chunk = _csv_chunk
+        return csv_chunk
+
+    def _iter_chunks(self, stream, buffer_size):
+        """ Yields csv chunk obtained by 
+        continuoulsy reading at most <buffer_size> unicode
+        character, and parsing it.
+        """
         while True:
-            i+=1
-            # TODO if buff is small it might be internet
-            # modifying its underlying buffer in place
-            # could be catastrophic.
             buff = stream.read(buffer_size)
             assert isinstance(buff, unicode)
-            buff_length = len(buff)
-            if buff_length == 0:
+            length = len(buff)
+            if length == 0:
                 break
-            csv_chunk = CsvChunk(buff)
-            csv_chunk._csv_chunk = self.csv_reader.read_chunk(buff, buff_length)
-            csv_chunks.append(csv_chunk)
-        return create_array(csv_chunks)
+            yield self._read_chunk(buff, length)
 
