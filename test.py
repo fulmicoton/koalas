@@ -9,6 +9,14 @@ import itertools
 from StringIO import StringIO
 
 
+"""
+Known (and wanted discrepancy with csv).
+
+- return a matrix (doh)
+- returns unicode object
+
+"""
+
 PARAMETERS = {
    "quotechar": ["\"", "\'"],
    "delimiter": ["\t", ","],
@@ -17,19 +25,10 @@ PARAMETERS = {
 }.items()
 
 
-# PARAMETERS = {
-#     "quotechar": ["\""],
-#     "delimiter": [","],
-#     "escapechar": ["\\"],
-#     "doublequote": [False, True],
-# }.items()
-
-
 def iter_csvcodec_params():
     (KEYS, VALUES) = zip(*PARAMETERS)
     for vals in itertools.product(*VALUES):
         yield dict(zip(KEYS, vals))
-
 
 
 def parsed_csv(s, params):
@@ -37,57 +36,46 @@ def parsed_csv(s, params):
     reader = csv.reader(ss, **params)
     return list(reader)
 
+
 def parsed_koalas(s, params):
     ss = StringIO(s)
     dialect = CsvDialect(**params)
     csv_reader = CsvReader(dialect)
     return csv_reader.read(ss)
 
-#dialect = csv_reader.CsvDialect()
-#dialect.delimiter = ";"
-#reader = csv_reader.CsvReader(dialect)
-
-
-
-
-
-
-# """
-# def test_koalas_csv():
-#     import codecs
-#     with codecs.open("test.csv", "r", "utf-8") as f:
-#         a = time.time()
-#         m = reader.read(f)
-#         print m[-100:]
-#         b = time.time()
-#         print "time", b - a
-
-
-# def test_pandas_csv():
-#     a = time.time()
-#     df = pandas.DataFrame.from_csv(open("test.csv"), encoding="utf-8", sep=';')
-
-#     b = time.time()
-#     print "pandas", b-a
-# """
 
 TEST_STRINGS = [
-    #u"a,b,c",
+    u"a,b,c",
     u"a,d,c\na,b,c\n",
+    u"a,d,c\na,b,c\na",
 ]
+
+
+def process_row(row):
+    """ Remove trailing nones
+    """
+    row_it = iter(row)
+    yield row_it.next()
+    while True:
+        field = row_it.next()
+        if field is None:
+            break
+        else:
+            yield unicode(field)
+
 
 def to_tuples(res):
     return tuple(
-        tuple (
-            unicode(field)
-            for field in row
-        )
+        tuple(process_row(row))
         for row in res
     )
+
 
 def run_test(test_string, parameter):
     res_csv = parsed_csv(test_string, parameter)
     res_koalas = parsed_koalas(test_string, parameter)
+    print to_tuples(res_csv)
+    print to_tuples(res_koalas)
     assert to_tuples(res_csv) == to_tuples(res_koalas)
 
 if __name__ == '__main__':

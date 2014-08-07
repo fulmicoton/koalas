@@ -87,7 +87,7 @@ public:
     void new_row();
     void push(CHAR c);
     void set_error(const std::string&);
-    void end();
+    void end_of_chunk();
 private:
     std::string error_msg;
     CHAR* last_CHAR;

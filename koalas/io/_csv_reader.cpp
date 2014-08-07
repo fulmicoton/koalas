@@ -46,8 +46,11 @@ void _CsvChunk::push(CHAR c) {
     current_field.length++;
 }
 
-void _CsvChunk::end() {
-    // TODO
+void _CsvChunk::end_of_chunk() {
+    if (current_field.length > 0) {
+        new_field();
+        new_row();
+    }
 }
 
 void _CsvChunk::set_error(const string&  error_msg_) {
@@ -164,6 +167,7 @@ _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int length) {
                 }
                 else {
                     chunk->set_error("Forbidden CHAR after \" in quoted field"); // TODO specify CHAR
+                    // TODO BREAK
                 }
                 break;
             case QUOTED:
@@ -178,6 +182,7 @@ _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int length) {
                 if (cursor.token == dialect.quotechar) {
                     // ERROR
                     chunk->set_error("Quotation mark within unquoted field forbidden");
+                    // TODO BREAK
                 }
                 else if (cursor.token == dialect.delimiter) {
                     chunk->new_field();
@@ -194,6 +199,7 @@ _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int length) {
                 break;
         }
     }
+    chunk->end_of_chunk();
     return chunk;
 }
 

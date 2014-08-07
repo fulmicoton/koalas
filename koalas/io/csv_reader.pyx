@@ -163,7 +163,7 @@ def create_array(chunks):
                 field = chunk.get(i, j)
                 res[row_id, j] = field
             row_id += 1
-        unclosed_row = chunk.get_row(I-1)
+        unclosed_row = chunk.get_row(last_row-1)
     return res
 
 
@@ -178,10 +178,10 @@ cdef class CsvReader:
     def __dealloc__(self):
         del self.csv_reader
 
-    def read(self, stream):
-        return self._read(stream)
+    def read(self, stream, buffer_size=1000000):
+        return self._read(stream, buffer_size)
 
-    cdef _read(self, stream):
+    cdef _read(self, stream, buffer_size):
         i = 0
         csv_chunks = deque()
         while True:
@@ -189,7 +189,7 @@ cdef class CsvReader:
             # TODO if buff is small it might be internet
             # modifying its underlying buffer in place
             # could be catastrophic.
-            buff = stream.read(1000000)
+            buff = stream.read(buffer_size)
             assert isinstance(buff, unicode)
             buff_length = len(buff)
             if buff_length == 0:
