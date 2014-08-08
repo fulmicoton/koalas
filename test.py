@@ -1,10 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from koalas.io.csv_reader import CsvDialect, reader
-import time
-import pandas
 import csv
-from collections import OrderedDict
 import itertools
 from StringIO import StringIO
 
@@ -16,15 +13,15 @@ Known, and wanted discrepancy with csv).
 - returns unicode object
 
 
-Known bug 
+Known bug
 - interned string may mess up if chunk buffer is len 1
 """
 
 PARAMETERS = {
-   "quotechar": ["\"", "\'"],
-   "delimiter": ["\t", ","],
-   "escapechar": ["\\", "|"],
-   "doublequote": [False, True],
+    "quotechar": ["\"", "\'"],
+    "delimiter": ["\t", ","],
+    "escapechar": ["\\", "|"],
+    "doublequote": [True],
 }.items()
 
 
@@ -36,8 +33,7 @@ def iter_csvcodec_params():
 
 def parsed_csv(s, params):
     ss = StringIO(s)
-    reader = csv.reader(ss, **params)
-    return list(reader)
+    return list(csv.reader(ss, **params))
 
 
 def copy_string(s):
@@ -48,16 +44,18 @@ def copy_string(s):
 def parsed_koalas(s, params):
     ss = StringIO(copy_string(s))
     dialect = CsvDialect(**params)
-    csv_reader = reader(ss, dialect)
-    return csv_reader.read_all()
-
+    return reader(ss, dialect).read_all()
 
 TEST_STRINGS = [
     u"a,b,c",
+    u"a,b,c",
+    u"a,b,c\"",
     u"a,d,c\na,b,c\n",
     u"a,d,c\na,b,c\na",
     u"a,d,c\na,b,c\na,",
-    u"",
+    u"a,\"bb\"\"b\"c",
+    u"a,\"bb,\"\"b\"c",
+    u"\"a,b\",\"b,c\"",
 ]
 
 
@@ -82,25 +80,18 @@ def to_tuples(res):
 
 
 def run_test(test_string, parameter):
-    res_csv = parsed_csv(test_string, parameter)
-    res_koalas = parsed_koalas(test_string, parameter)
-    print "csv", to_tuples(res_csv)
-    print "koalas", to_tuples(res_koalas)
-    assert to_tuples(res_csv) == to_tuples(res_koalas)
+    res_csv = to_tuples(parsed_csv(test_string, parameter))
+    print "csv", res_csv
+    res_koalas = to_tuples(parsed_koalas(test_string, parameter))
+    print "koalas", res_koalas
+    print "------0"
+    assert res_csv == res_koalas
 
 if __name__ == '__main__':
     for test_string in TEST_STRINGS:
         print "\n\n-------"
-        print test_string.encode("utf-8")
+        print (test_string + u"|").encode("utf-8")
         for parameter in iter_csvcodec_params():
             print "--"
             print parameter
             run_test(test_string, parameter)
-    
-    #import timeit
-    #print(timeit.timeit("test_koalas()", number=1, setup="from __main__ import test_koalas"))
-
-#.tokenize_str(u"aaa,bcwerwerwerweこあらa").__class__
-#print "a"
-#print csv_reader.tokenize_str(u"aaa,bcwerwerwerweこあらa").__class__
-#print csv_reader.tokenize_str(u"aaa,bこcwerwerwerweこあらa").encode("utf-8")

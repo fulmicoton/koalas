@@ -9,16 +9,16 @@
 namespace koalas {
 
 
-typedef Py_UNICODE CHAR;
+typedef Py_UNICODE pychar;
 
 
-class _Field {
-public:
-    _Field(CHAR* s_)
+struct _Field {
+
+    _Field(pychar* s_)
     :s(s_)
     ,length(0) {}
 
-    _Field(CHAR* s_, int length_)
+    _Field(pychar* s_, int length_)
     :s(s_)
     ,length(length_) {}
 
@@ -26,13 +26,14 @@ public:
     :s(other.s)
     ,length(other.length) {}
 
-    CHAR* s;
-    int length;   
+    pychar* s;
+    int length;
+
 };
 
 
 
-typedef std::vector<_Field> ROW;
+typedef std::vector<_Field> Row;
 
 
 // --------------------------
@@ -45,30 +46,29 @@ enum LINE_TERMINATOR {
     CRLF_TERMINATOR   // \r\n   WINDOWS STYLE
 };
 
-enum QUOTING {
+
+
+enum Quoting {
     QUOTE_MINIMAL,
     QUOTE_ALL,
     QUOTE_NONNUMERIC,
     QUOTE_NONE
 };
 
-struct _CsvDialect {
-public:
-    _CsvDialect()
-    :delimiter(',')
-    ,quotechar('"')
-    ,escapechar('\\')
-    ,doublequote(true)
-    ,lineterminator(LF_TERMINATOR)
-    ,quoting(QUOTE_MINIMAL) {}
 
-    CHAR delimiter;
-    CHAR quotechar;
-    CHAR escapechar;
+
+struct _CsvDialect {
+
+    _CsvDialect();
+
+    pychar delimiter;
+    pychar quotechar;
+    pychar escapechar;
     bool doublequote;
     // bool skipinitialspace;
     LINE_TERMINATOR lineterminator;
-    QUOTING quoting;
+    Quoting quoting;
+
 };
 
 
@@ -76,33 +76,33 @@ public:
 class _CsvChunk {
 
 public:
-    _CsvChunk(CHAR* buffer, int length);
+    _CsvChunk(const pychar* buffer, int length);
     ~_CsvChunk();
     int nb_rows() const;
     int nb_columns() const;
     const _Field* get(int i, int j) const;
 
-    void append_buffer(CHAR* buffer);
+    void append_buffer(pychar* buffer);
     void new_field();
     void new_row();
-    void push(CHAR c);
+    void push(pychar c);
     void set_error(const std::string&);
     void end_of_chunk();
     std::string error_msg;
 
 private:
-    CHAR* last_CHAR;
-    std::vector<CHAR*> buffers;
-    CHAR* buffer;
+    pychar* last_pychar;
+    std::vector<pychar*> buffers;
+    pychar* buffer;
     _Field* current_field;
-    std::vector<ROW*> rows;
-    ROW* current_row;
+    std::vector<Row*> rows;
+    Row* current_row;
 };
 
 
 enum _CsvReaderState {
     START_FIELD,
-    START_ROW,
+    START_Row,
     QUOTED,
     UNQUOTED,
     QUOTE_IN_QUOTED
@@ -110,16 +110,19 @@ enum _CsvReaderState {
 
 
 
-
-
 class _CsvReader {
+
 public:
     _CsvReader(const _CsvDialect* dialect_);
-    _CsvChunk* read_chunk(CHAR* buffer, const int buffer_length);
+    ~_CsvReader();
+    _CsvChunk* read_chunk(const pychar* buffer, const int buffer_length);
 private:
     _CsvReaderState state;
     const _CsvDialect dialect;
+    pychar* remaining;
 };
+
+
 
 }
 

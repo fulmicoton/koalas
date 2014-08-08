@@ -17,7 +17,7 @@ cdef extern from "_csv_reader.hpp" namespace "koalas":
 
     cdef cppclass _CsvReader:
         _CsvReader(const _CsvDialect* dialect_) except +
-        _CsvChunk* read_chunk(Py_UNICODE* buff, const int buffer_length)
+        _CsvChunk* read_chunk(const Py_UNICODE* buff, const int buffer_length)
 
     cdef cppclass _CsvChunk:
         const _Field* get(int i, int j) const
@@ -34,7 +34,7 @@ cdef extern from "_csv_reader.hpp" namespace "koalas":
         bool doublequote
         # bool skipinitialspace;
         # LINE_TERMINATOR lineterminator;
-        # QUOTING quoting;
+        # Quoting quoting;
 
 
 cdef class CsvDialect:

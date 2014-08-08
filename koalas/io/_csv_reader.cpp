@@ -11,19 +11,37 @@ using namespace std;
 namespace koalas {
 
 
-_CsvChunk::_CsvChunk(CHAR* buffer_, int length)
-:last_CHAR(buffer_)
+//////////////////////////////
+//  _CsvDialect
+
+_CsvDialect::_CsvDialect()
+:delimiter(',')
+,quotechar('"')
+,escapechar('\\')
+,doublequote(true)
+,lineterminator(LF_TERMINATOR)
+,quoting(QUOTE_MINIMAL) {}
+
+
+
+
+//////////////////////////////
+//  _CsvChunk
+
+_CsvChunk::_CsvChunk(const pychar* buffer_, int length)
+:last_pychar(NULL)
 {
-    buffer = new CHAR[length];
-    memcpy(buffer, buffer_, length * sizeof(CHAR));
-    current_row = new ROW();
+    buffer = new pychar[length];
+    // memcpy(buffer, buffer_, length * sizeof(pychar));
+    last_pychar = buffer;
+    current_row = new Row();
     rows.push_back(current_row);
 }
 
 
 _CsvChunk::~_CsvChunk() {
     delete buffer;
-    vector<ROW*>::const_iterator row_it;
+    vector<Row*>::const_iterator row_it;
     for (row_it = rows.begin();
          row_it != rows.end();
          ++row_it) {
@@ -31,21 +49,25 @@ _CsvChunk::~_CsvChunk() {
     }
 }
 
+
 void _CsvChunk::new_field() {
-    current_row->push_back(_Field(last_CHAR, 0));
+    current_row->push_back(_Field(last_pychar, 0));
     current_field = &*(current_row->rbegin());
 }
 
+
 void _CsvChunk::new_row() {
-    current_row = new ROW();
+    current_row = new Row();
     rows.push_back(current_row);
 }
 
-void _CsvChunk::push(CHAR c) {
-    *last_CHAR = c;
-    last_CHAR++;
+
+void _CsvChunk::push(pychar c) {
+    *last_pychar = c;
+    last_pychar++;
     current_field->length++;
 }
+
 
 void _CsvChunk::end_of_chunk() {
     if (current_row->size() == 0) {
@@ -53,12 +75,14 @@ void _CsvChunk::end_of_chunk() {
     }
 }
 
+
 void _CsvChunk::set_error(const string&  error_msg_) {
      error_msg = error_msg_;
 }
 
+
 const _Field* _CsvChunk::get(int i, int j) const {
-    const ROW* row = rows[i];
+    const Row* row = rows[i];
     if (j < row->size()) {
         return &(*row)[j];
     }
@@ -67,13 +91,15 @@ const _Field* _CsvChunk::get(int i, int j) const {
     }
 }
 
+
 int _CsvChunk::nb_rows() const {
     return rows.size();
 }
 
+
 int _CsvChunk::nb_columns() const {
     int nb_cols = 0;
-    vector<ROW*>::const_iterator row_it;
+    vector<Row*>::const_iterator row_it;
     for (row_it = rows.begin();
          row_it != rows.end();
          ++row_it) {
@@ -83,22 +109,35 @@ int _CsvChunk::nb_columns() const {
     return nb_cols;    
 }
 
-_CsvReader::_CsvReader(const _CsvDialect* dialect_)
-:state(START_ROW)
-,dialect(*dialect_) {}
 
+
+//////////////////////////////
+//  _CsvReader
+
+_CsvReader::_CsvReader(const _CsvDialect* dialect_)
+:state(START_Row)
+,dialect(*dialect_)
+,remaining(NULL) {}
+
+
+_CsvReader::~_CsvReader() {
+    if (remaining != NULL) {
+        delete remaining;
+        remaining = NULL;
+    }
+}
 
 
 struct Cursor {
-    Cursor(CHAR* buffer, int length_)
+    Cursor(const pychar* buffer, int length_)
     :cursor(buffer)
     ,length(length_)
     ,offset(0) {
         // token = *cursor;
     }
 
-    CHAR token;
-    CHAR* cursor;
+    pychar token;
+    const pychar* cursor;
     int length;
     int offset;
   
@@ -119,13 +158,9 @@ struct Cursor {
 static const int CR = '\r';
 static const int LF = '\n';
 
-_CsvChunk* _CsvReader::read_chunk(CHAR* data, const int length) {
-    if (PyString_CHECK_INTERNED(data)) {
-        // WE NEED TO COPY THE BUFFER BEFORE WORKING
-    }
-
+_CsvChunk* _CsvReader::read_chunk(const pychar* data, const int length) {
     _CsvChunk* chunk = new _CsvChunk(data, length);
-   
+    size_t parsed_chars = 0;
     Cursor cursor = Cursor(data, length);
     while (cursor.next()) {
         if (cursor.token == CR) {
@@ -135,7 +170,7 @@ _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int length) {
             continue;
         }
         switch (state) {
-            case START_ROW:
+            case START_Row:
                 if (cursor.token == dialect.quotechar) {
                     chunk->new_field();
                     state = QUOTED;
@@ -146,6 +181,7 @@ _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int length) {
                 }
                 else if (cursor.token == LF) {
                     chunk->new_row();
+                    parsed_chars = cursor.offset;
                 }
                 else {
                     chunk->new_field();
@@ -162,8 +198,9 @@ _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int length) {
                 }
                 else if (cursor.token == LF) {
                     chunk->new_row();
+                    parsed_chars = cursor.offset;
                     chunk->new_field();
-                    state = START_ROW;
+                    state = START_Row;
                 }
                 else {
                     chunk->push(cursor.token);
@@ -181,8 +218,9 @@ _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int length) {
                 }
                 else if (cursor.token == LF) {
                     chunk->new_row();
+                    parsed_chars = cursor.offset;
                     chunk->new_field();
-                    state = START_ROW;
+                    state = START_Row;
                 }
                 else {
                     //chunk->push(dialect.quotechar);
@@ -203,9 +241,14 @@ _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int length) {
                     chunk->new_field();
                     state = START_FIELD;
                 }
+                else if (cursor.token == dialect.quotechar) {
+                    state = QUOTED; //< actually an error but the csv
+                                    // module behaves like that.
+                }
                 else if (cursor.token == LF) {
                     chunk->new_row();
-                    state = START_ROW;
+                    parsed_chars = cursor.offset;
+                    state = START_Row;
                 }
                 else {
                     chunk->push(cursor.token);
@@ -214,6 +257,8 @@ _CsvChunk* _CsvReader::read_chunk(CHAR* data, const int length) {
         }
     }
     chunk->end_of_chunk();
+    remaining = new pychar[length - parsed_chars];
+
     return chunk;
 }
 
