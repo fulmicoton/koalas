@@ -21,16 +21,9 @@ PARAMETERS = {
     "quotechar": ["\"", "\'"],
     "delimiter": ["\t", ","],
     "escapechar": ["\\", "|"],
-    "doublequote": [True],
+    "doublequote": [True, False],
 }.items()
 
-
-PARAMETERS = {
-    "quotechar": ["\""],
-    "delimiter": [","],
-    "escapechar": ["\\"],
-    "doublequote": [True],
-}.items()
 
 
 def iter_csvcodec_params():
@@ -55,16 +48,18 @@ def parsed_koalas(s, params):
     return reader(ss, dialect).read_all()
 
 TEST_STRINGS = [
-    #u"a,b,c\na,b,c\na,b,c\na,b,c",
-    #u"a,d,c\na,b,c\na,d,c\na,b,c\na,d,c\na,b,c\n",
-    #u"a,d,c\na,b,c\naa,d,c\na,b,c\naa,d,c\na,b,c\na",
-    #u"a,"
-    # u"a,d,c\na,b,c\naa,d,c\na,b,c\naa,d,c\na,b,c\na,",
-    # u"a,d,c\na,b,c\na,\n",
-    # u"a,\n",
-    # u"a,\"bb\"\"b\",ca,\"bb\"\"b\",ca,\"bb\"\"b\",c",
-    # u"a,\"bb,\"\"b\"c",
+    u"a,b,c\na,b,c\na,b,c\na,b,c",
+    u"a,d,c\na,b,c\na,d,c\na,b,c\na,d,c\na,b,c\n",
+    u"a,d,c\na,b,c\naa,d,c\na,b,c\naa,d,c\na,b,c\na",
+    u"a,"
+    u"a,d,c\na,b,c\naa,d,c\na,b,c\naa,d,c\na,b,c\na,",
+    u"a,d,c\na,b,c\na,\n",
+    u"a,\n",
+    u"a,\"bb\"\"b\",ca,\"bb\"\"b\",ca,\"bb\"\"b\",c",
+    u"a,\"bb,\"\"b\"c",
     u"\"a,b\",\"b,c\"",
+    u"\"a,b\"\",\"b,c\"",
+    u"a,b\"\",b,c\"",
 ]
 
 
@@ -72,14 +67,12 @@ def _process_row(row):
     """ Remove trailing nones
     """
     row_it = iter(row)
-    # yield unicode(row_it.next())
     while True:
         field = row_it.next()
-        #print "field", field
         if field is None:
             break
         else:
-            yield str(field)
+            yield unicode(field)
 
 
 def process_row(row):
@@ -103,11 +96,11 @@ def run_test(test_string, parameter):
         print "\n--------------"
         print parameter
         print test_string
-        print "Refused ", e
+        print "Invalid CSV ", e
         return
     if res_csv != res_koalas:
         print "\n--------------"
-        print "Error"
+        print "Different"
         print parameter
         print u"<" + test_string.encode("utf-8") + u">"
         print "csv   ", res_csv

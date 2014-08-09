@@ -129,7 +129,6 @@ cdef class CsvChunk:
 
 
 def create_array(chunks):
-    print chunks
     if not chunks:
         return np.empty((0, 0), dtype=np.object)
     nb_cols = max(chunk.nb_columns() for chunk in chunks)
@@ -202,12 +201,7 @@ cdef class CsvReader:
             assert isinstance(buff, unicode)
             length = len(buff)
             last_chunk = length < buffer_size
-            chunk = self._read_chunk(buff, length, last_chunk)
-            print "\n\n\n----------"
-            print "Buffer", buff
-            print "Remaining after", self.remaining()
-            print "To array", chunk.to_array()
-            yield chunk
+            yield self._read_chunk(buff, length, last_chunk)
             if last_chunk:
                 break
 

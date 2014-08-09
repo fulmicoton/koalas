@@ -88,7 +88,6 @@ public:
     void push(pychar c);
     bool ok() const { return error_msg.size() == 0; }
     void set_error(const std::string&);
-    // void end_of_chunk();
     void pop_last();
     std::string error_msg;
 
