@@ -11,6 +11,8 @@ using namespace std;
 namespace koalas {
 
 
+static int MAX_CHARS_PER_LINE = 100000;
+
 //////////////////////////////
 //  _CsvDialect
 
@@ -68,21 +70,19 @@ void _CsvChunk::push(pychar c) {
 }
 
 
-void _CsvChunk::end_of_chunk() {
-    if (current_row->size() == 0) {
-        rows.pop_back();
-    }
+// void _CsvChunk::end_of_chunk() {
+//     if (current_row->size() == 0) {
+//         rows.pop_back();
+//     }
+// }
+
+
+
+
+void _CsvChunk::pop_last() {
+    rows.pop_back();
 }
 
-
-
-void _CsvChunk::trim_last() {
-    if (rows.size() > 0) {
-        if ((*rows.rbegin())->size() == 0) {
-            rows.pop_back();
-        }
-    }
-}
 
 void _CsvChunk::set_error(const string&  error_msg_) {
      error_msg = error_msg_;
@@ -126,7 +126,9 @@ _CsvReader::_CsvReader(const _CsvDialect* dialect_)
 //:state(START_ROW)
 :dialect(*dialect_)
 ,remaining(NULL)
-,remaining_length(0) {}
+,remaining_length(0) {
+    remaining = new pychar[MAX_CHARS_PER_LINE];
+}
 
 
 _CsvReader::~_CsvReader() {
@@ -182,9 +184,9 @@ size_t _CsvReader::_read_chunk(_CsvChunk* chunk,
             // a carriage return
             continue;
         }
+        cout << "cursortoken" << (int)cursor.token << ":" << (char)cursor.token << endl;
         switch (state) {
             case START_ROW:
-                parsed_chars = cursor.offset;
                 chunk -> new_row();
                 if (cursor.token == dialect.quotechar) {
                     chunk->new_field();
@@ -202,13 +204,13 @@ size_t _CsvReader::_read_chunk(_CsvChunk* chunk,
                 }
                 break;
             case START_FIELD:
-                chunk -> new_field();
                 if (cursor.token == dialect.quotechar) {
                     state = QUOTED;
                 }
                 else if (cursor.token == dialect.delimiter) {
                 }
                 else if (cursor.token == LF) {
+                    parsed_chars = cursor.offset;
                     state = START_ROW;
                 }
                 else {
@@ -222,9 +224,11 @@ size_t _CsvReader::_read_chunk(_CsvChunk* chunk,
                     state = QUOTED;
                 }
                 else if (cursor.token == dialect.delimiter) {
+                    chunk -> new_field();
                     state = START_FIELD;
                 }
                 else if (cursor.token == LF) {
+                    parsed_chars = cursor.offset;
                     state = START_ROW;
                 }
                 else {
@@ -242,7 +246,9 @@ size_t _CsvReader::_read_chunk(_CsvChunk* chunk,
                 }
                 break;
             case UNQUOTED:
+
                 if (cursor.token == dialect.delimiter) {
+                    chunk -> new_field();
                     state = START_FIELD;
                 }
                 else if (cursor.token == dialect.quotechar) {
@@ -250,6 +256,7 @@ size_t _CsvReader::_read_chunk(_CsvChunk* chunk,
                     return parsed_chars;
                 }
                 else if (cursor.token == LF) {
+                    parsed_chars = cursor.offset;
                     state = START_ROW;
                 }
                 else {
@@ -267,23 +274,54 @@ _CsvChunk* _CsvReader::read_chunk(const pychar* data,
                                   bool last_chunk) {
     _CsvChunk* chunk = new _CsvChunk(length + remaining_length);
     _CsvReaderState state = START_ROW;
+    size_t parsed_chars = 0;
+    size_t parsed_chars_remaining = 0;
+    size_t parsed_chars_buffer = 0;
     if (remaining_length > 0) {
-        _read_chunk(chunk, remaining, remaining_length, state);
+        parsed_chars_remaining = _read_chunk(chunk, remaining, remaining_length, state);
+        cout << "parsed_chars remaining : " << parsed_chars << endl;
     }
     if (!chunk->ok()) {
         return chunk;
     }
-    size_t parsed_chars = _read_chunk(chunk, data, length, state);
+    parsed_chars_buffer += _read_chunk(chunk, data, length, state);
+    if (parsed_chars_buffer > 0) {
+        parsed_chars_remaining = remaining_length;
+    }
+    parsed_chars = parsed_chars_buffer + parsed_chars_remaining;
+    cout << "parsed_chars overall : " << parsed_chars << endl;
     if (last_chunk) {
-        _read_chunk(chunk, &LF, 1, state);
+        if (state != START_ROW) {
+            // chunk -> new_row();
+            //_read_chunk(chunk, &LF, 0, state);
+
+        }
     }
     else {
-        remaining_length = length - parsed_chars;
-        remaining = new pychar[length - parsed_chars];
+        const size_t new_remaining_length = length + remaining_length - parsed_chars;
+        if (new_remaining_length > 0) {
+            if (new_remaining_length > MAX_CHARS_PER_LINE) {
+                chunk->set_error("Line is greater than MAX_CHARS_PER_LINE chars is forbidden.");
+                return chunk;
+            }
+            if (new_remaining_length > length) {
+                cout << "REMAINING " << endl;
+                // the new remaining section includes some chars from
+                // the former remaining section
+                for (size_t i = 0; i < remaining_length - parsed_chars; ++i) {
+                    remaining[i] = remaining[parsed_chars + i];
+                }
+                memcpy(remaining + remaining_length - parsed_chars, data, length * sizeof(pychar));
+            }
+            else {
+                memcpy(remaining, data + (length - new_remaining_length), new_remaining_length * sizeof(pychar));   
+            }
+            chunk -> pop_last();
+        }
+        // we rewind the last incomplete row
+        remaining_length = new_remaining_length;
     }
-    cout << "Remaining " << remaining_length << endl;
-    memcpy(remaining, data + parsed_chars, remaining_length*sizeof(pychar));
-    chunk->end_of_chunk();
+    // chunk->end_of_chunk();
     return chunk;
 }
 

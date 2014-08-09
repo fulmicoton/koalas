@@ -25,6 +25,14 @@ PARAMETERS = {
 }.items()
 
 
+PARAMETERS = {
+    "quotechar": ["\""],
+    "delimiter": [","],
+    "escapechar": ["\\"],
+    "doublequote": [True],
+}.items()
+
+
 def iter_csvcodec_params():
     (KEYS, VALUES) = zip(*PARAMETERS)
     for vals in itertools.product(*VALUES):
@@ -47,16 +55,16 @@ def parsed_koalas(s, params):
     return reader(ss, dialect).read_all()
 
 TEST_STRINGS = [
-    u"a,b,c",
-    u"a,b,c",
-    #u"a,b,c\"",
-    u"a,d,c\na,b,c\n",
-    u"a,d,c\na,b,c\na",
-    u"a,d,c\na,b,c\na,",
-    u"a,d,c\na,b,c\na,\n",
-    u"a,\"bb\"\"b\",c",
-    #u"a,\"bb,\"\"b\"c",
-    #u"\"a,b\",\"b,c\"",
+    #u"a,b,c\na,b,c\na,b,c\na,b,c",
+    #u"a,d,c\na,b,c\na,d,c\na,b,c\na,d,c\na,b,c\n",
+    #u"a,d,c\na,b,c\naa,d,c\na,b,c\naa,d,c\na,b,c\na",
+    #u"a,"
+    # u"a,d,c\na,b,c\naa,d,c\na,b,c\naa,d,c\na,b,c\na,",
+    # u"a,d,c\na,b,c\na,\n",
+    # u"a,\n",
+    # u"a,\"bb\"\"b\",ca,\"bb\"\"b\",ca,\"bb\"\"b\",c",
+    # u"a,\"bb,\"\"b\"c",
+    u"\"a,b\",\"b,c\"",
 ]
 
 
@@ -71,7 +79,7 @@ def _process_row(row):
         if field is None:
             break
         else:
-            yield unicode(field)
+            yield str(field)
 
 
 def process_row(row):
@@ -91,18 +99,18 @@ def run_test(test_string, parameter):
     res_csv = to_tuples(parsed_csv(test_string, parameter))
     try:
         res_koalas = to_tuples(parsed_koalas(test_string, parameter))
-    except ValueError:
+    except ValueError as e:
         print "\n--------------"
         print parameter
         print test_string
-        print "Refused "
+        print "Refused ", e
         return
     if res_csv != res_koalas:
         print "\n--------------"
         print "Error"
         print parameter
         print u"<" + test_string.encode("utf-8") + u">"
-        print "csv", res_csv
+        print "csv   ", res_csv
         print "koalas", res_koalas
     else:
         print "Ok"

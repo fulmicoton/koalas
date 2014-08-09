@@ -88,13 +88,12 @@ public:
     void push(pychar c);
     bool ok() const { return error_msg.size() == 0; }
     void set_error(const std::string&);
-    void end_of_chunk();
-    void trim_last();
+    // void end_of_chunk();
+    void pop_last();
     std::string error_msg;
 
 private:
     pychar* last_pychar;
-    std::vector<pychar*> buffers;
     pychar* buffer;
     _Field* current_field;
     std::vector<Row*> rows;
@@ -120,12 +119,12 @@ public:
     _CsvChunk* read_chunk(const pychar* buffer,
                           const size_t length,
                           bool last_chunk);
-private:
-    size_t _read_chunk(_CsvChunk* dest, const pychar* buffer, const size_t length, _CsvReaderState& state);
-    // _CsvReaderState state;
-    const _CsvDialect dialect;
     pychar* remaining;
     size_t remaining_length;
+private:
+    size_t _read_chunk(_CsvChunk* dest, const pychar* buffer, const size_t length, _CsvReaderState& state);
+    const _CsvDialect dialect;
+
 };
 
 

@@ -17,7 +17,9 @@ cdef extern from "_csv_reader.hpp" namespace "koalas":
 
     cdef cppclass _CsvReader:
         _CsvReader(const _CsvDialect* dialect_) except +
-        _CsvChunk* read_chunk(const Py_UNICODE* buff, const int buffer_length, last_chunk)
+        _CsvChunk* read_chunk(const Py_UNICODE* buff, const int buffer_length, bool last_chunk)
+        Py_UNICODE* remaining
+        size_t remaining_length
 
     cdef cppclass _CsvChunk:
         const _Field* get(int i, int j) const
@@ -25,7 +27,6 @@ cdef extern from "_csv_reader.hpp" namespace "koalas":
         int nb_columns() const
         bool ok() const
         string error_msg
-        void trim_last() 
 
     cdef cppclass _CsvDialect:
         _CsvDialect() except +
@@ -110,20 +111,16 @@ cdef class CsvChunk:
         else:
             return field.s[:field.length]
 
-    def get_row(self, row_id):
-        row = []
-        j = 0
-        while True:
-            cell = self.get(row_id, j)
-            if cell is None:
-                return row
-            else:
-                row.append(cell)
-            j += 1
-
-    def trim_last(self,):
-        self._csv_chunk.trim_last()
-
+    def to_array(self,):
+        I = self.nb_rows()
+        J = self.nb_columns()
+        res = np.empty((I, J), dtype=np.object)
+        for i in range(I):
+            for j in range(J):
+                cell = self.get(i, j)
+                res[i, j] = cell
+        return res
+    
     def nb_rows(self,):
         return self._csv_chunk.nb_rows()
 
@@ -132,6 +129,7 @@ cdef class CsvChunk:
 
 
 def create_array(chunks):
+    print chunks
     if not chunks:
         return np.empty((0, 0), dtype=np.object)
     nb_cols = max(chunk.nb_columns() for chunk in chunks)
@@ -145,12 +143,11 @@ def create_array(chunks):
         J = chunk.nb_columns()
         for i in range(I):
             for j in range(J):
-                field = chunk.get(i, j)
-                res[row_id, j] = field
+                res[row_id, j] = chunk.get(i, j)
             row_id += 1
     return res
 
-def reader(stream, csv_dialect, buffer_length=10000000):
+def reader(stream, csv_dialect, buffer_length=10):
     return CsvReader(stream, csv_dialect, buffer_length)
 
 cdef class CsvReader:
@@ -181,8 +178,10 @@ cdef class CsvReader:
         length -- the number of char handled per csv_chunk
         """
         csv_chunks = deque(self._iter_chunks(self.stream, self.buffer_length))
-        csv_chunks[-1].trim_last()
         return create_array(csv_chunks)
+
+    def remaining(self,):
+        return self.csv_reader.remaining[:self.csv_reader.remaining_length]
 
     cdef CsvChunk _read_chunk(self, buff, length, last_chunk):
         csv_chunk = CsvChunk()
@@ -203,7 +202,12 @@ cdef class CsvReader:
             assert isinstance(buff, unicode)
             length = len(buff)
             last_chunk = length < buffer_size
-            yield self._read_chunk(buff, length, last_chunk)
+            chunk = self._read_chunk(buff, length, last_chunk)
+            print "\n\n\n----------"
+            print "Buffer", buff
+            print "Remaining after", self.remaining()
+            print "To array", chunk.to_array()
+            yield chunk
             if last_chunk:
                 break
 
