@@ -17,7 +17,7 @@ cdef extern from "_csv_reader.hpp" namespace "koalas":
 
     cdef cppclass _CsvReader:
         _CsvReader(const _CsvDialect* dialect_) except +
-        _CsvChunk* read_chunk(const Py_UNICODE* buff, const int buffer_length)
+        _CsvChunk* read_chunk(const Py_UNICODE* buff, const int buffer_length, last_chunk)
 
     cdef cppclass _CsvChunk:
         const _Field* get(int i, int j) const
@@ -25,6 +25,7 @@ cdef extern from "_csv_reader.hpp" namespace "koalas":
         int nb_columns() const
         bool ok() const
         string error_msg
+        void trim_last() 
 
     cdef cppclass _CsvDialect:
         _CsvDialect() except +
@@ -120,6 +121,9 @@ cdef class CsvChunk:
                 row.append(cell)
             j += 1
 
+    def trim_last(self,):
+        self._csv_chunk.trim_last()
+
     def nb_rows(self,):
         return self._csv_chunk.nb_rows()
 
@@ -128,36 +132,22 @@ cdef class CsvChunk:
 
 
 def create_array(chunks):
-    # return np.empty((0, 0), dtype=np.object)
     if not chunks:
         return np.empty((0, 0), dtype=np.object)
     nb_cols = max(chunk.nb_columns() for chunk in chunks)
-    nb_rows = sum(chunk.nb_rows() for chunk in chunks) - len(chunks) + 1
+    nb_rows = sum(chunk.nb_rows() for chunk in chunks)
     res = np.empty((nb_rows, nb_cols), dtype=np.object)
     row_id = 0
     col_id = 0
-    unclosed_row = None
-    unclosed_col = None
-    incomplete_cell = None
     while chunks:
         chunk = chunks.popleft()
         I = chunk.nb_rows()
         J = chunk.nb_columns()
-        start_row = 0
-        if unclosed_row is not None:
-            first_row = chunk.get_row(0)
-            start_row += 1
-            row = (unclosed_row[:-1] + [unclosed_row[-1] + first_row[0]] + first_row[1:])[:J]
-            for (j, v)  in enumerate(row):
-                res[row_id, j] = v
-            row_id += 1
-        last_row = I - (1 if chunks else 0)
-        for i in range(start_row, last_row):
+        for i in range(I):
             for j in range(J):
                 field = chunk.get(i, j)
                 res[row_id, j] = field
             row_id += 1
-        unclosed_row = chunk.get_row(last_row-1)
     return res
 
 def reader(stream, csv_dialect, buffer_length=10000000):
@@ -191,11 +181,12 @@ cdef class CsvReader:
         length -- the number of char handled per csv_chunk
         """
         csv_chunks = deque(self._iter_chunks(self.stream, self.buffer_length))
+        csv_chunks[-1].trim_last()
         return create_array(csv_chunks)
 
-    cdef CsvChunk _read_chunk(self, buff, length):
+    cdef CsvChunk _read_chunk(self, buff, length, last_chunk):
         csv_chunk = CsvChunk()
-        cdef _CsvChunk* _csv_chunk = self.csv_reader.read_chunk(buff, length)
+        cdef _CsvChunk* _csv_chunk = self.csv_reader.read_chunk(buff, length, last_chunk)
         error_msg = unicode(_csv_chunk.error_msg)
         csv_chunk._csv_chunk = _csv_chunk
         if len(error_msg) > 0:
@@ -211,7 +202,9 @@ cdef class CsvReader:
             buff = stream.read(buffer_size)
             assert isinstance(buff, unicode)
             length = len(buff)
-            if length == 0:
+            last_chunk = length < buffer_size
+            yield self._read_chunk(buff, length, last_chunk)
+            if last_chunk:
                 break
-            yield self._read_chunk(buff, length)
+
 

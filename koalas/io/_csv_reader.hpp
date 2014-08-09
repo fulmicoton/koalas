@@ -76,7 +76,7 @@ struct _CsvDialect {
 class _CsvChunk {
 
 public:
-    _CsvChunk(const pychar* buffer, int length);
+    _CsvChunk(size_t length);
     ~_CsvChunk();
     int nb_rows() const;
     int nb_columns() const;
@@ -86,8 +86,10 @@ public:
     void new_field();
     void new_row();
     void push(pychar c);
+    bool ok() const { return error_msg.size() == 0; }
     void set_error(const std::string&);
     void end_of_chunk();
+    void trim_last();
     std::string error_msg;
 
 private:
@@ -102,7 +104,7 @@ private:
 
 enum _CsvReaderState {
     START_FIELD,
-    START_Row,
+    START_ROW,
     QUOTED,
     UNQUOTED,
     QUOTE_IN_QUOTED
@@ -115,11 +117,15 @@ class _CsvReader {
 public:
     _CsvReader(const _CsvDialect* dialect_);
     ~_CsvReader();
-    _CsvChunk* read_chunk(const pychar* buffer, const int buffer_length);
+    _CsvChunk* read_chunk(const pychar* buffer,
+                          const size_t length,
+                          bool last_chunk);
 private:
-    _CsvReaderState state;
+    size_t _read_chunk(_CsvChunk* dest, const pychar* buffer, const size_t length, _CsvReaderState& state);
+    // _CsvReaderState state;
     const _CsvDialect dialect;
     pychar* remaining;
+    size_t remaining_length;
 };
 
 

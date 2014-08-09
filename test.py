@@ -49,27 +49,35 @@ def parsed_koalas(s, params):
 TEST_STRINGS = [
     u"a,b,c",
     u"a,b,c",
-    u"a,b,c\"",
+    #u"a,b,c\"",
     u"a,d,c\na,b,c\n",
     u"a,d,c\na,b,c\na",
     u"a,d,c\na,b,c\na,",
-    u"a,\"bb\"\"b\"c",
-    u"a,\"bb,\"\"b\"c",
-    u"\"a,b\",\"b,c\"",
+    u"a,d,c\na,b,c\na,\n",
+    u"a,\"bb\"\"b\",c",
+    #u"a,\"bb,\"\"b\"c",
+    #u"\"a,b\",\"b,c\"",
 ]
 
 
-def process_row(row):
+def _process_row(row):
     """ Remove trailing nones
     """
     row_it = iter(row)
-    yield unicode(row_it.next())
+    # yield unicode(row_it.next())
     while True:
         field = row_it.next()
+        #print "field", field
         if field is None:
             break
         else:
             yield unicode(field)
+
+
+def process_row(row):
+    row = list(row)
+    res = list(_process_row(row))
+    return res
 
 
 def to_tuples(res):
@@ -81,17 +89,26 @@ def to_tuples(res):
 
 def run_test(test_string, parameter):
     res_csv = to_tuples(parsed_csv(test_string, parameter))
-    print "csv", res_csv
-    res_koalas = to_tuples(parsed_koalas(test_string, parameter))
-    print "koalas", res_koalas
-    print "------0"
-    assert res_csv == res_koalas
+    try:
+        res_koalas = to_tuples(parsed_koalas(test_string, parameter))
+    except ValueError:
+        print "\n--------------"
+        print parameter
+        print test_string
+        print "Refused "
+        return
+    if res_csv != res_koalas:
+        print "\n--------------"
+        print "Error"
+        print parameter
+        print u"<" + test_string.encode("utf-8") + u">"
+        print "csv", res_csv
+        print "koalas", res_koalas
+    else:
+        print "Ok"
+    
 
 if __name__ == '__main__':
     for test_string in TEST_STRINGS:
-        print "\n\n-------"
-        print (test_string + u"|").encode("utf-8")
         for parameter in iter_csvcodec_params():
-            print "--"
-            print parameter
             run_test(test_string, parameter)
