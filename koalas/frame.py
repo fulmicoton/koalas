@@ -1,5 +1,7 @@
 from collections import OrderedDict
 import numpy as np
+#from koalas import io
+from io import csv
 
 
 class Column(object):
@@ -83,6 +85,34 @@ class ColumnRef(object):
         return ColumnRef(self.column.pick(row_selector))
 
 
+import re
+NB_GUESS_LINES = 1000
+FLOAT_PTN = re.compile("^\d+\.\d*$")
+INT_PTN = re.compile("^[0-9]+$")
+
+
+def guess(column):
+    """ given a list of values
+    returns a "guessed" type """
+    nb_others = 0
+    nb_floats = 0
+    nb_ints = 0
+    for val in column:
+        if val is not None:
+            if INT_PTN.match(val):
+                nb_ints += 1
+            elif FLOAT_PTN.match(val):
+                nb_floats += 1
+            else:
+                nb_others += 1
+    if nb_ints > 10 * nb_others:
+        return np.int
+    elif nb_floats + nb_ints > 10 * nb_others:
+        return np.float
+    else:
+        return np.object
+
+
 class DataFrame(object):
 
     __slots__ = (
@@ -93,6 +123,28 @@ class DataFrame(object):
     def __init__(self, col_map):
         self.__col_map = col_map
         self.nb_rows = col_map.values()[0].nb_rows
+    
+    @staticmethod
+    def from_csv(f, dtypes=None, **kwargs):
+        chunk_it = csv.reader(f, **kwargs).chunks()
+        first_chunk = chunk_it.next()
+        if first_chunk is None:
+            raise ValueError("Empty csv file.")
+        while first_chunk.nb_rows() == 0:
+            first_chunk = chunk_it.next()
+            if first_chunk is None:
+                raise ValueError("Empty csv file.")
+        headers = first_chunk.pop_row()
+        chunks = csv.ChunkCollection([first_chunk] + list(chunk_it))
+        guess_data = chunks.first_nb_rows(10)
+        if dtypes is None:
+            dtypes = map(guess, guess_data.transpose())
+        columns = [
+            np.array(col_data, dtype=col_dtype)
+            for (col_dtype, col_data) in zip(dtypes, guess_data)
+        ]
+        return DataFrame.from_items(zip(headers, columns))
+
 
     @property
     def dtypes(self,):

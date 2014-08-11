@@ -79,7 +79,7 @@ public:
     _CsvChunk(size_t length);
     ~_CsvChunk();
     int nb_rows() const;
-    int nb_columns() const;
+    int nb_cols() const;
     const _Field* get(int i, int j) const;
 
     void append_buffer(pychar* buffer);
@@ -90,6 +90,7 @@ public:
     void set_error(const std::string&);
     void pop_last();
     std::string error_msg;
+    void remove_row(int row_id);
 
 private:
     pychar* last_pychar;

@@ -31,7 +31,7 @@ _CsvDialect::_CsvDialect()
 //  _CsvChunk
 
 _CsvChunk::_CsvChunk(size_t length)
-:last_pychar(NULL)
+:last_pychar(NULL)  
 {
     buffer = new pychar[length];
     last_pychar = buffer;
@@ -62,6 +62,9 @@ void _CsvChunk::new_row() {
     rows.push_back(current_row);
 }
 
+void _CsvChunk::remove_row(int i) {
+    rows.erase(rows.begin() + i);
+}
 
 void _CsvChunk::push(pychar c) {
     *last_pychar = c;
@@ -96,7 +99,7 @@ int _CsvChunk::nb_rows() const {
 }
 
 
-int _CsvChunk::nb_columns() const {
+int _CsvChunk::nb_cols() const {
     int nb_cols = 0;
     vector<Row*>::const_iterator row_it;
     for (row_it = rows.begin();

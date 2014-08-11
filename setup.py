@@ -7,7 +7,7 @@ from Cython.Distutils import build_ext
 setup(
   name='koalas',
   ext_modules=cythonize(
-            "koalas/io/csv_reader.pyx",
+            "koalas/io/csv.pyx",
             sources=["koalas/io/_csv_reader.cpp"],
             language="c++",
             cmdclass={"build_ext": build_ext},

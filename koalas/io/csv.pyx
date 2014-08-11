@@ -9,6 +9,9 @@ from libcpp cimport bool
 from libcpp.string cimport string
 import json
 
+
+DEFAULT_BUFFER_SIZE = 1000000
+
 cdef extern from "_csv_reader.hpp" namespace "koalas":
 
     cdef cppclass _Field:
@@ -24,7 +27,8 @@ cdef extern from "_csv_reader.hpp" namespace "koalas":
     cdef cppclass _CsvChunk:
         const _Field* get(int i, int j) const
         int nb_rows() const
-        int nb_columns() const
+        int nb_cols() const
+        void remove_row(int row_id)
         bool ok() const
         string error_msg
 
@@ -96,6 +100,27 @@ cdef class CsvDialect:
             tuple(map(json.dumps, [self.quotechar, self.delimiter, self.escapechar, self.doublequote]))
 
 
+class ChunkCollection:
+
+    def __init__(self, chunks):
+        self.chunks = deque(chunks)
+        self.nb_rows = sum(chunk.nb_rows() for chunk in self.chunks)
+        self.nb_cols = self.chunks[0].nb_cols()
+
+    def first_nb_rows(self, nb_rows):
+        nb_rows = min(nb_rows, self.nb_rows)
+        arr = np.empty((nb_rows, self.nb_cols), dtype=np.object)
+        offset = 0
+        J = self.nb_cols
+        for chunk in self.chunks:
+            for i in range(chunk.nb_rows()):
+                for j in range(J):
+                    arr[offset, j] = chunk.get(i, j)
+                offset += 1
+                if offset > nb_rows:
+                    return arr
+        return arr
+
 cdef class CsvChunk:
 
     cdef _CsvChunk* _csv_chunk
@@ -111,9 +136,21 @@ cdef class CsvChunk:
         else:
             return field.s[:field.length]
 
+    def pop_row(self, row_id=0):
+        row = self.row(row_id)
+        self._csv_chunk.remove_row(row_id)
+        return row
+
+    def row(self, i):
+        J = self.nb_cols()
+        row = np.empty((J,), dtype=np.object)
+        for j in range(J):
+            row[j] = self.get(i, j)
+        return row
+
     def to_array(self,):
         I = self.nb_rows()
-        J = self.nb_columns()
+        J = self.nb_cols()
         res = np.empty((I, J), dtype=np.object)
         for i in range(I):
             for j in range(J):
@@ -124,14 +161,14 @@ cdef class CsvChunk:
     def nb_rows(self,):
         return self._csv_chunk.nb_rows()
 
-    def nb_columns(self,):
-        return self._csv_chunk.nb_columns()
+    def nb_cols(self,):
+        return self._csv_chunk.nb_cols()
 
 
 def create_array(chunks):
     if not chunks:
         return np.empty((0, 0), dtype=np.object)
-    nb_cols = max(chunk.nb_columns() for chunk in chunks)
+    nb_cols = max(chunk.nb_cols() for chunk in chunks)
     nb_rows = sum(chunk.nb_rows() for chunk in chunks)
     res = np.empty((nb_rows, nb_cols), dtype=np.object)
     row_id = 0
@@ -139,15 +176,18 @@ def create_array(chunks):
     while chunks:
         chunk = chunks.popleft()
         I = chunk.nb_rows()
-        J = chunk.nb_columns()
+        J = chunk.nb_cols()
         for i in range(I):
             for j in range(J):
                 res[row_id, j] = chunk.get(i, j)
             row_id += 1
     return res
 
-def reader(stream, csv_dialect, buffer_length=10):
+DEFAULT_DIALECT = CsvDialect()
+
+def reader(stream, csv_dialect=DEFAULT_DIALECT, buffer_length=10):
     return CsvReader(stream, csv_dialect, buffer_length)
+
 
 cdef class CsvReader:
 
@@ -159,7 +199,7 @@ cdef class CsvReader:
         cdef _CsvDialect * _csv_dialect = csv_dialect.get_csv_dialect()
         self.csv_reader = new _CsvReader(_csv_dialect)
 
-    def __init__(self, stream, csv_dialect, buffer_length=10000000):
+    def __init__(self, stream, csv_dialect, buffer_length=DEFAULT_BUFFER_SIZE):
         """
         dialect --
         stream -- a file-like object streaming unicode characters
@@ -176,7 +216,7 @@ cdef class CsvReader:
 
         length -- the number of char handled per csv_chunk
         """
-        csv_chunks = deque(self._iter_chunks(self.stream, self.buffer_length))
+        csv_chunks = deque(self.chunks(self.stream, self.buffer_length))
         return create_array(csv_chunks)
 
     def remaining(self,):
@@ -191,17 +231,19 @@ cdef class CsvReader:
             raise ValueError(error_msg)
         return csv_chunk
 
-    def _iter_chunks(self, stream, buffer_size):
+    def chunks(self, buffer_size=DEFAULT_BUFFER_SIZE):
         """ Yields csv chunk obtained by 
         continuoulsy reading at most <buffer_size> unicode
         character, and parsing it.
         """
         while True:
-            buff = stream.read(buffer_size)
+            buff = self.stream.read(buffer_size)
             assert isinstance(buff, unicode)
             length = len(buff)
             last_chunk = length < buffer_size
-            yield self._read_chunk(buff, length, last_chunk)
+            chunk = self._read_chunk(buff, length, last_chunk)
+            if chunk.nb_rows() > 0:
+                yield chunk
             if last_chunk:
                 break
 

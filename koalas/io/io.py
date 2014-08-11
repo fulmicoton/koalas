@@ -1,4 +1,4 @@
-import csv
+from .csv import reader as csv_reader
 import numpy as np
 from itertools import izip_longest, izip
 from ..frame import DataFrame
@@ -51,17 +51,3 @@ def iter_blocks(lines, dtypes, block_nb_lines):
             return
         yield columns
 
-
-def from_csv(f, dtypes=None, **kwargs):
-    lines = csv.reader(f, **kwargs)
-    headers = lines.next()
-    # nb_columns = len(headers)
-    guess_data = [row for (_, row) in izip(xrange(NB_GUESS_LINES), lines)]
-    guess_data = list(izip_longest(*guess_data))
-    if dtypes is None:
-        dtypes = map(guess, guess_data)
-    columns = [
-        np.array(col_data, dtype=col_dtype)
-        for (col_dtype, col_data) in zip(dtypes, guess_data)
-    ]
-    return DataFrame.from_items(zip(headers, columns))

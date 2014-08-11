@@ -2,6 +2,8 @@
 __pycache__/
 *.py[cod]
 
+koalas/io/csv.cpp
+
 # C extensions
 *.so
 
