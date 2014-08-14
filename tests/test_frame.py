@@ -28,7 +28,7 @@ def test_row_selection():
     assert TEST_DF.select(["col_3"]).columns == ['col_3']
 
 def test_import_csv():
-    df = io.from_csv(open_resource('test.csv'))
+    df = DataFrame.from_csv(open_resource('test.csv'))
     print df.dtypes
     assert df.dtypes == (np.int, np.float, np.object)
 

@@ -31,7 +31,6 @@ _CsvDialect::_CsvDialect()
 bool _Field::to_int(int* dest) {
     /* Only accepts (-|+)?\d+ patterns.
        Returns true if valid, or false if invalid.
-
        When valid, writes the result in the point dest.
      */
 

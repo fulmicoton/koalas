@@ -92,6 +92,8 @@ class ColumnRef(object):
 
 
 import re
+import codecs
+
 NB_GUESS_LINES = 1000
 FLOAT_PTN = re.compile("^\d+\.\d*$")
 INT_PTN = re.compile("^[0-9]+$")
@@ -119,6 +121,19 @@ def guess(column):
         return np.object
 
 
+def open_stream(f):
+    """ from an argument f, returns
+    a value unicode stream"""
+    if hasattr(f, "read"):
+        return f
+    elif isinstance(f, basestring):
+        # we assume this is a filepath
+        # for a utf-8 encode file
+        return codecs.open(f, encoding="utf-8")
+    else:
+        raise ValueError("Function expected either a filepath or a file-like object.")
+
+
 class DataFrame(object):
 
     __slots__ = (
@@ -129,10 +144,11 @@ class DataFrame(object):
     def __init__(self, col_map):
         self.__col_map = col_map
         self.nb_rows = col_map.values()[0].nb_rows
-    
+
     @staticmethod
     def from_csv(f, dtypes=None, **kwargs):
-        chunk_it = csv.reader(f, **kwargs).chunks()
+        stream = open_stream(f)
+        chunk_it = csv.reader(stream, **kwargs).chunks()
         first_chunk = chunk_it.next()
         if first_chunk is None:
             raise ValueError("Empty csv file.")

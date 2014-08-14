@@ -117,13 +117,13 @@ class ChunkCollection:
         nb_rows = min(nb_rows, self.nb_rows)
         arr = np.empty((nb_rows, self.nb_cols), dtype=np.object)
         offset = 0
-        J = self.nb_cols
+        J = self.nb_cols    
         for chunk in self.chunks:
             for i in range(chunk.nb_rows()):
                 for j in range(J):
                     arr[offset, j] = chunk.get(i, j)
                 offset += 1
-                if offset > nb_rows:
+                if offset >= nb_rows:
                     return arr
         return arr
 
