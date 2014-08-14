@@ -6,14 +6,25 @@ from StringIO import StringIO
 
 
 def test_empty():
-    data = u"a,b\nc,1\nd,2\ne,3"
+    data = u"a,b\nc,1\nd,2\ne,4\nf,6\ng,8"
+    #data = u"a,b\nc,d\nd,e\ne,f\nf,f\ng,a"
     stream = StringIO(data)
     df = DataFrame.from_csv(stream)
+    print df
     #res = reader(stream).read_all()
     #print res
     #assert res.shape == (2, 2)
 
-test_empty()
+#test_empty()
+import pandas as pd
+import numpy as np
+data = u"a,b\nc,1\nd,2\ne,4\nf,6\ng,8\nh,a"
+#help(pd.read_csv)
+df = pd.read_csv(StringIO(data), dtype={"a":np.object,"b":np.int})
+print df
+#print df.dtypes
+
+#test_empty()
 
 #def test_frame():
 

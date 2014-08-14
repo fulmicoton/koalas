@@ -55,6 +55,9 @@ class MemoryColumn(Column):
     def pick(self, row_selector):
         return MemoryColumn(self.data[row_selector])
 
+    def __str__(self,):
+        return "MemCol:" + str(self.data)
+
 
 class ColumnRef(object):
 
@@ -63,6 +66,9 @@ class ColumnRef(object):
     def __init__(self, column,):
         self.column = column
         self.column.inc_ref()
+
+    def __str__(self,):
+        return "ColRef:" + str(self.column)
 
     def __del__(self,):
         self.column.dec_ref()
@@ -136,15 +142,11 @@ class DataFrame(object):
                 raise ValueError("Empty csv file.")
         headers = first_chunk.pop_row()
         chunks = csv.ChunkCollection([first_chunk] + list(chunk_it))
-        guess_data = chunks.first_nb_rows(10)
         if dtypes is None:
+            guess_data = chunks.first_nb_rows(NB_GUESS_LINES)
             dtypes = map(guess, guess_data.transpose())
-        columns = [
-            np.array(col_data, dtype=col_dtype)
-            for (col_dtype, col_data) in zip(dtypes, guess_data)
-        ]
+        columns = chunks.get_columns(dtypes)
         return DataFrame.from_items(zip(headers, columns))
-
 
     @property
     def dtypes(self,):
@@ -239,7 +241,7 @@ class DataFrame(object):
         )
 
     def str_row(self, i):
-        return " | ".join(self.row(i))
+        return " | ".join(map(str, self.row(i)))
 
     def __str__(self,):
         return self.str_header() + "\n" + self.str_body()

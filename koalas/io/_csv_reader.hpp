@@ -26,6 +26,9 @@ struct _Field {
     :s(other.s)
     ,length(other.length) {}
 
+    bool to_int(int* dest);
+    bool to_float(int* dest);
+
     pychar* s;
     int length;
 

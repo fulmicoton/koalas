@@ -99,6 +99,12 @@ cdef class CsvDialect:
         return """CsvDialect(quotechar=%s,delimiter=%s,escapechar=%s,doublequote=%s)""" %\
             tuple(map(json.dumps, [self.quotechar, self.delimiter, self.escapechar, self.doublequote]))
 
+TYPE_READER_MAP = {
+    np.object: (lambda x: x),
+    np.int: np.int,
+    np.float: np.float
+
+}
 
 class ChunkCollection:
 
@@ -120,6 +126,26 @@ class ChunkCollection:
                 if offset > nb_rows:
                     return arr
         return arr
+
+    def get_columns(self, dtypes):
+        res = [
+            np.empty((self.nb_rows,), dtype=dtype)
+            for dtype in dtypes
+        ]
+        J = self.nb_cols
+        offset = 0
+        type_readers = [TYPE_READER_MAP[dtype] for dtype in dtypes]
+        for chunk in self.chunks:
+            for (j, type_reader) in enumerate(type_readers):
+                col = res[j]
+                for i in range(chunk.nb_rows()):
+                    try:
+                        col[offset + i] = type_reader(chunk.get(i, j))
+                    except ValueError:
+                        col[offset + i] = 0
+            offset += chunk.nb_rows()
+        return res
+
 
 cdef class CsvChunk:
 

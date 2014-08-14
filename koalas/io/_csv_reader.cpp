@@ -25,10 +25,122 @@ _CsvDialect::_CsvDialect()
 ,quoting(QUOTE_MINIMAL) {}
 
 
+//////////////////////////////
+//  _Field
+
+bool _Field::to_int(int* dest) {
+    /* Only accepts (-|+)?\d+ patterns.
+       Returns true if valid, or false if invalid.
+
+       When valid, writes the result in the point dest.
+     */
+
+    if (length == 0) {
+        return false;
+    }
+
+    int offset=0;
+    int sign = 1;
+    int res;
+    pychar* cur = s;
+
+    if (*cur == '+') {
+        cur++; 
+        offset++;
+
+    }
+    else if (*cur == '-') {
+        sign = -1;
+        cur++;
+        offset++;
+    }
+
+    for (; offset < length; offset++) {
+        res *= 10;
+        int digit = (*cur) - '0';
+        if ((digit < 0) || (digit > 9)) {
+            return false;
+        }
+        res += digit;
+        cur++;
+    }
+    
+    if (sign = 1) {
+        *dest = res;
+    }
+    else {
+        *dest = -res;
+    }
+
+    return true;
+}
+
+bool _Field::to_float(int* dest) {
+    /* */
+    if (length == 0) {
+        return false;
+    }
+
+    int offset=0;
+    int sign = 1;
+    int int_part = 0;
+    float dec_part = 0.0;
+    float res = 0.0;
+    float dec = 1.0;
+
+    pychar* cur = s;
+
+    if (*cur == '+') {
+        cur++; 
+        offset++;
+
+    }
+    else if (*cur == '-') {
+        sign = -1;
+        cur++;
+        offset++;
+    }
+
+    for (; offset < length; offset++) {
+        res *= 10;
+        int digit = (*cur) - '0';
+        if ((digit < 0) || (digit > 9)) {
+            if ((*cur) == '.') {
+                offset++; cur++;
+                break;
+            }
+            else {
+                return false;    
+            }    
+        }
+        res += digit;
+        cur++;
+    }
+
+    for (; offset < length; offset++) {
+        int digit = (*cur) - '0';
+        if ((digit >= 0) || (digit <= 9)) {
+            return false;
+        }
+        dec /= 10.;
+        dec_part += dec * digit;
+        cur++;
+    }
+
+    res = int_part + decimal_part;
+    if (sign = 1) {
+        *dest = res;
+    }
+    else {
+        *dest = -res;
+    }
+    return true;
+}
 
 
 //////////////////////////////
 //  _CsvChunk
+
 
 _CsvChunk::_CsvChunk(size_t length)
 :last_pychar(NULL)  
