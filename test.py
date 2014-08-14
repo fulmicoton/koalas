@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from koalas.io.csv_reader import CsvDialect, reader
+from koalas.io.csv import CsvDialect, reader
 import csv
 import itertools
 from StringIO import StringIO
@@ -23,7 +23,6 @@ PARAMETERS = {
     "escapechar": ["\\", "|"],
     "doublequote": [True, False],
 }.items()
-
 
 
 def iter_csvcodec_params():
@@ -107,7 +106,6 @@ def run_test(test_string, parameter):
         print "koalas", res_koalas
     else:
         print "Ok"
-    
 
 if __name__ == '__main__':
     for test_string in TEST_STRINGS:

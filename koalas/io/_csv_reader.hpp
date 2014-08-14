@@ -83,7 +83,7 @@ public:
     ~_CsvChunk();
     int nb_rows() const;
     int nb_cols() const;
-    const _Field* get(int i, int j) const;
+    const _Field* get(size_t i, size_t j) const;
 
     void append_buffer(pychar* buffer);
     void new_field();
@@ -117,6 +117,7 @@ enum _CsvReaderState {
 class _CsvReader {
 
 public:
+
     _CsvReader(const _CsvDialect* dialect_);
     ~_CsvReader();
     _CsvChunk* read_chunk(const pychar* buffer,

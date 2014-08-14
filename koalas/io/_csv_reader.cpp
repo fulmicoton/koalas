@@ -41,7 +41,7 @@ bool _Field::to_int(int* dest) {
 
     int offset=0;
     int sign = 1;
-    int res;
+    int res = 0;
     pychar* cur = s;
 
     if (*cur == '+') {
@@ -65,7 +65,7 @@ bool _Field::to_int(int* dest) {
         cur++;
     }
     
-    if (sign = 1) {
+    if (sign == 1) {
         *dest = res;
     }
     else {
@@ -127,8 +127,8 @@ bool _Field::to_float(int* dest) {
         cur++;
     }
 
-    res = int_part + decimal_part;
-    if (sign = 1) {
+    res = int_part + dec_part;
+    if (sign == 1) {
         *dest = res;
     }
     else {
@@ -195,7 +195,7 @@ void _CsvChunk::set_error(const string&  error_msg_) {
 }
 
 
-const _Field* _CsvChunk::get(int i, int j) const {
+const _Field* _CsvChunk::get(size_t i, size_t j) const {
     const Row* row = rows[i];
     if (j < row->size()) {
         return &(*row)[j];
@@ -229,9 +229,10 @@ int _CsvChunk::nb_cols() const {
 //  _CsvReader
 
 _CsvReader::_CsvReader(const _CsvDialect* dialect_)
-:dialect(*dialect_)
-,remaining(NULL)
-,remaining_length(0) {
+:remaining(NULL)
+,remaining_length(0)
+,dialect(*dialect_)
+{
     remaining = new pychar[MAX_CHARS_PER_LINE];
 }
 

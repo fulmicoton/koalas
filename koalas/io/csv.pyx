@@ -25,7 +25,7 @@ cdef extern from "_csv_reader.hpp" namespace "koalas":
         size_t remaining_length
 
     cdef cppclass _CsvChunk:
-        const _Field* get(int i, int j) const
+        const _Field* get(size_t i, size_t j) const
         int nb_rows() const
         int nb_cols() const
         void remove_row(int row_id)
@@ -242,7 +242,7 @@ cdef class CsvReader:
 
         length -- the number of char handled per csv_chunk
         """
-        csv_chunks = deque(self.chunks(self.stream, self.buffer_length))
+        csv_chunks = deque(self.chunks(buffer_size=self.buffer_length))
         return create_array(csv_chunks)
 
     def remaining(self,):
