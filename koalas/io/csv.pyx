@@ -6,9 +6,10 @@ cimport numpy as np
 from cpython.ref cimport PyObject, Py_INCREF, Py_DECREF
 from collections import deque
 from libcpp cimport bool
+from libc.stdlib cimport malloc, free
+from libcpp.vector cimport vector
 from libcpp.string cimport string
 import json
-
 
 DEFAULT_BUFFER_SIZE = 1000000
 
@@ -31,6 +32,8 @@ cdef extern from "_csv_reader.hpp" namespace "koalas":
         void remove_row(int row_id)
         bool ok() const
         string error_msg
+        bool fill_int(int col, long long* dest) const
+        bool fill_float(int col, double* dest) const
 
     cdef cppclass _CsvDialect:
         _CsvDialect() except +
@@ -103,54 +106,78 @@ TYPE_READER_MAP = {
     np.object: (lambda x: x),
     np.int: np.int,
     np.float: np.float
-
 }
 
-class ChunkCollection:
 
-    def __init__(self, chunks):
+cdef class ChunkCollection:
+
+    cdef int nb_cols
+    cdef int nb_rows
+    cdef object chunks
+
+    def __cinit__(self, chunks):
         self.chunks = deque(chunks)
         self.nb_rows = sum(chunk.nb_rows() for chunk in self.chunks)
         self.nb_cols = self.chunks[0].nb_cols()
 
-    def first_nb_rows(self, nb_rows):
-        nb_rows = min(nb_rows, self.nb_rows)
-        arr = np.empty((nb_rows, self.nb_cols), dtype=np.object)
-        offset = 0
-        J = self.nb_cols    
+    def get_columns(self, dtypes):
+        res = []
+        J = self.nb_cols
+        if J != len(dtypes):
+            raise ValueError("Expected as many dtypes value as there is columns.")
+        for (col_id, dtype) in enumerate(dtypes):
+            col_res = np.empty((self.nb_rows,), dtype=dtype)
+            if dtype == np.int64:
+                self.fill_int(col_id, col_res)
+            elif dtype == np.float64:
+                self.fill_float(col_id, col_res)
+            else:
+                self.fill_unicode(col_id, col_res)   
+            res.append(col_res)
+        return res
+
+    cpdef bool fill_int(self, size_t col, np.ndarray[np.int64_t, ndim=1] arr):
+        cdef size_t offset = 0
+        for chunk in self.chunks:
+            if not chunk.fill_int(col, arr, offset):
+                return False
+            offset += chunk.nb_rows()
+        return True
+
+
+    cpdef bool fill_float(self, size_t col, np.ndarray[np.float64_t, ndim=1] arr):
+        cdef size_t offset = 0
+        for chunk in self.chunks:
+            if not chunk.fill_float(col, arr, offset):
+                return False
+            offset += chunk.nb_rows()
+        return True
+
+    cpdef bool fill_unicode(self, size_t col, np.ndarray[object, ndim=1] arr):
+        cdef size_t offset = 0
         for chunk in self.chunks:
             for i in range(chunk.nb_rows()):
-                for j in range(J):
-                    arr[offset, j] = chunk.get(i, j)
-                offset += 1
-                if offset >= nb_rows:
-                    return arr
-        return arr
+                arr[offset] = chunk.get(i, col) 
+                offset += 1 #chunk.nb_rows()
+        return True
 
-    def get_columns(self, dtypes):
-        res = [
-            np.empty((self.nb_rows,), dtype=dtype)
-            for dtype in dtypes
-        ]
-        J = self.nb_cols
-        offset = 0
-        type_readers = [TYPE_READER_MAP[dtype] for dtype in dtypes]
-        for chunk in self.chunks:
-            for (j, type_reader) in enumerate(type_readers):
-                col = res[j]
-                for i in range(chunk.nb_rows()):
-                    try:
-                        col[offset + i] = type_reader(chunk.get(i, j))
-                    except ValueError:
-                        col[offset + i] = 0
-            offset += chunk.nb_rows()
+    cpdef object guess_types(self,):
+        res = []
+        cdef np.ndarray[np.int64_t, ndim=1] int_buffer = np.empty((self.nb_rows,), dtype=np.int64)
+        cdef np.ndarray[np.float64_t, ndim=1] float_buffer = np.empty((self.nb_rows,), dtype=np.float64)
+        for col in range(self.nb_cols):
+            if self.fill_int(<int>col, int_buffer):
+                res.append(np.int64)
+            elif self.fill_float(<int>col, float_buffer):
+                res.append(np.float64)
+            else:
+                res.append(np.object)
         return res
 
 
 cdef class CsvChunk:
 
     cdef _CsvChunk* _csv_chunk
-
 
     def __dealloc__(self):
         del self._csv_chunk
@@ -183,12 +210,18 @@ cdef class CsvChunk:
                 cell = self.get(i, j)
                 res[i, j] = cell
         return res
-    
+
     def nb_rows(self,):
         return self._csv_chunk.nb_rows()
 
     def nb_cols(self,):
-        return self._csv_chunk.nb_cols()
+        return self._csv_chunk.nb_cols()    
+
+    cpdef fill_int(self, size_t col, np.ndarray[np.int64_t, ndim=1] arr, size_t offset):
+        return self._csv_chunk.fill_int(col, <long long*>arr.data + offset)
+
+    cpdef fill_float(self, int col, np.ndarray[np.float64_t, ndim=1] arr, size_t offset):
+        return self._csv_chunk.fill_float(col, <double*>arr.data + offset)
 
 
 def create_array(chunks):
@@ -211,7 +244,8 @@ def create_array(chunks):
 
 DEFAULT_DIALECT = CsvDialect()
 
-def reader(stream, csv_dialect=DEFAULT_DIALECT, buffer_length=10):
+
+def reader(stream, csv_dialect=DEFAULT_DIALECT, buffer_length=DEFAULT_BUFFER_SIZE):
     return CsvReader(stream, csv_dialect, buffer_length)
 
 

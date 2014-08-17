@@ -28,7 +28,15 @@ _CsvDialect::_CsvDialect()
 //////////////////////////////
 //  _Field
 
-bool _Field::to_int(int* dest) {
+
+void _Field::print() const {
+    for (int i=0; i<length; ++i) {
+        cout << (char)s[i]; 
+    } 
+    cout << endl; 
+}
+
+bool _Field::to_int(long long* dest) const {
     /* Only accepts (-|+)?\d+ patterns.
        Returns true if valid, or false if invalid.
        When valid, writes the result in the point dest.
@@ -70,11 +78,10 @@ bool _Field::to_int(int* dest) {
     else {
         *dest = -res;
     }
-
     return true;
 }
 
-bool _Field::to_float(int* dest) {
+bool _Field::to_float(double* dest) const {
     /* */
     if (length == 0) {
         return false;
@@ -105,7 +112,8 @@ bool _Field::to_float(int* dest) {
         int digit = (*cur) - '0';
         if ((digit < 0) || (digit > 9)) {
             if ((*cur) == '.') {
-                offset++; cur++;
+                offset++;
+                cur++;
                 break;
             }
             else {
@@ -115,10 +123,9 @@ bool _Field::to_float(int* dest) {
         res += digit;
         cur++;
     }
-
     for (; offset < length; offset++) {
         int digit = (*cur) - '0';
-        if ((digit >= 0) || (digit <= 9)) {
+        if ((digit < 0) || (digit > 9)) {
             return false;
         }
         dec /= 10.;
@@ -162,6 +169,11 @@ _CsvChunk::~_CsvChunk() {
 }
 
 
+
+bool _CsvChunk::ok() const {
+    return error_msg.size() == 0;
+}
+
 void _CsvChunk::new_field() {
     current_row->push_back(_Field(last_pychar, 0));
     current_field = &*(current_row->rbegin());
@@ -173,7 +185,7 @@ void _CsvChunk::new_row() {
     rows.push_back(current_row);
 }
 
-void _CsvChunk::remove_row(int i) {
+void _CsvChunk::remove_row(size_t i) {
     rows.erase(rows.begin() + i);
 }
 
@@ -191,6 +203,32 @@ void _CsvChunk::pop_last() {
 
 void _CsvChunk::set_error(const string&  error_msg_) {
      error_msg = error_msg_;
+}
+
+bool _CsvChunk::fill_int(size_t col, long long* dest) const {
+    vector<Row*>::const_iterator row_it;
+    for (row_it=rows.begin(); row_it!=rows.end(); ++row_it) {
+        const Row& row = **row_it;
+        const _Field& field = row[col];
+        if (!field.to_int(dest)) {
+            return false;
+        }
+        dest++;
+    }
+    return true;
+}
+
+
+bool _CsvChunk::fill_float(size_t col, double* dest) const {
+    for (size_t i=0; i<rows.size(); i++) {
+        const Row& row = *rows[i];
+        const _Field& field = row[col];
+        if (!field.to_float(dest)) {
+            return false;
+        }
+        dest++;
+    }
+    return true;
 }
 
 

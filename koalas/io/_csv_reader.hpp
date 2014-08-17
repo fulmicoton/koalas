@@ -26,8 +26,10 @@ struct _Field {
     :s(other.s)
     ,length(other.length) {}
 
-    bool to_int(int* dest);
-    bool to_float(int* dest);
+    bool to_int(long long* dest) const;
+    bool to_float(double* dest) const;
+
+    void print() const;
 
     pychar* s;
     int length;
@@ -89,11 +91,13 @@ public:
     void new_field();
     void new_row();
     void push(pychar c);
-    bool ok() const { return error_msg.size() == 0; }
+    bool ok() const;
     void set_error(const std::string&);
     void pop_last();
     std::string error_msg;
-    void remove_row(int row_id);
+    void remove_row(size_t row_id);
+    bool fill_int(size_t col, long long* dest) const;
+    bool fill_float(size_t col, double* dest) const;
 
 private:
     pychar* last_pychar;

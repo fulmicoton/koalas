@@ -1,7 +1,7 @@
 from collections import OrderedDict
 import numpy as np
-#from koalas import io
 from io import csv
+import codecs
 
 
 class Column(object):
@@ -91,36 +91,6 @@ class ColumnRef(object):
         return ColumnRef(self.column.pick(row_selector))
 
 
-import re
-import codecs
-
-NB_GUESS_LINES = 1000
-FLOAT_PTN = re.compile("^\d+\.\d*$")
-INT_PTN = re.compile("^[0-9]+$")
-
-
-def guess(column):
-    """ given a list of values
-    returns a "guessed" type """
-    nb_others = 0
-    nb_floats = 0
-    nb_ints = 0
-    for val in column:
-        if val is not None:
-            if INT_PTN.match(val):
-                nb_ints += 1
-            elif FLOAT_PTN.match(val):
-                nb_floats += 1
-            else:
-                nb_others += 1
-    if nb_ints > 10 * nb_others:
-        return np.int
-    elif nb_floats + nb_ints > 10 * nb_others:
-        return np.float
-    else:
-        return np.object
-
-
 def open_stream(f):
     """ from an argument f, returns
     a value unicode stream"""
@@ -159,8 +129,7 @@ class DataFrame(object):
         headers = first_chunk.pop_row()
         chunks = csv.ChunkCollection([first_chunk] + list(chunk_it))
         if dtypes is None:
-            guess_data = chunks.first_nb_rows(NB_GUESS_LINES)
-            dtypes = map(guess, guess_data.transpose())
+            dtypes = chunks.guess_types()
         columns = chunks.get_columns(dtypes)
         return DataFrame.from_items(zip(headers, columns))
 

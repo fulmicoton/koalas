@@ -5,11 +5,12 @@ from koalas import DataFrame
 from StringIO import StringIO
 import numpy as np
 
+
 def test_empty():
-    data = u"a,b\nc,1\nd,2\ne,4\nf,e"
+    data = u"a,d,c\nc,4,1.1\nd,2,2.1\ne,4,3.2\nf,3,3.2"
     #data = u"a,b\nc,d\nd,e\ne,f\nf,f\ng,a"
     stream = StringIO(data)
-    df = DataFrame.from_csv(stream, dtypes=(np.object, np.int))
+    df = DataFrame.from_csv(stream,)
     print df
     print df.dtypes
     #res = reader(stream).read_all()
