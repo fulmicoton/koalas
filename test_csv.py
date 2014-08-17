@@ -4,15 +4,26 @@
 from koalas import DataFrame
 from StringIO import StringIO
 import numpy as np
-
+import pandas as pd
 
 def test_empty():
-    data = u"a,d,c\nc,4,1.1\nd,2,2.1\ne,4,3.2\nf,3,3.2"
-    #data = u"a,b\nc,d\nd,e\ne,f\nf,f\ng,a"
+    # data = u"a,d,c\nc,4,1.1\nd,2,2.1\ne,4,3.2\nf,3,3.2"
+    data = u"a,s,d\nc,,d\nd,e\ne,f\nf,f\ng,a"
     stream = StringIO(data)
-    df = DataFrame.from_csv(stream,)
-    print df
-    print df.dtypes
+    #df = pd.read_csv("acquisitions_full.csv",)
+    #df = DataFrame.from_csv(stream) #"acquisitions_full.csv")
+    # df = pd.read_csv("acquisitions_full.csv",)
+    df = DataFrame.from_csv("acquisitions_full.csv",)
+    # df = df.select(["acquired_year"])
+    
+    #sub_df= df.select(["acquired_year"]) #print end-start, 's'
+    # print sub_df
+    #print df.dtypes[17]
+    #print df.columns[17]
+    #print len(df.dtypes)
+    # cols = list(df.columns)[:3]
+    #print cols
+    # print unicode(df.select(cols)).encode("utf-8")
     #res = reader(stream).read_all()
     #print res
     #assert res.shape == (2, 2)

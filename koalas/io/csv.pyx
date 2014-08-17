@@ -102,12 +102,6 @@ cdef class CsvDialect:
         return """CsvDialect(quotechar=%s,delimiter=%s,escapechar=%s,doublequote=%s)""" %\
             tuple(map(json.dumps, [self.quotechar, self.delimiter, self.escapechar, self.doublequote]))
 
-TYPE_READER_MAP = {
-    np.object: (lambda x: x),
-    np.int: np.int,
-    np.float: np.float
-}
-
 
 cdef class ChunkCollection:
 
@@ -138,7 +132,7 @@ cdef class ChunkCollection:
 
     cpdef bool fill_int(self, size_t col, np.ndarray[np.int64_t, ndim=1] arr):
         cdef size_t offset = 0
-        for chunk in self.chunks:
+        for (chunkid, chunk) in enumerate(self.chunks):
             if not chunk.fill_int(col, arr, offset):
                 return False
             offset += chunk.nb_rows()
@@ -158,7 +152,7 @@ cdef class ChunkCollection:
         for chunk in self.chunks:
             for i in range(chunk.nb_rows()):
                 arr[offset] = chunk.get(i, col) 
-                offset += 1 #chunk.nb_rows()
+                offset += 1
         return True
 
     cpdef object guess_types(self,):

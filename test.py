@@ -47,18 +47,19 @@ def parsed_koalas(s, params):
     return reader(ss, dialect).read_all()
 
 TEST_STRINGS = [
-    u"a,b,c\na,b,c\na,b,c\na,b,c",
-    u"a,d,c\na,b,c\na,d,c\na,b,c\na,d,c\na,b,c\n",
-    u"a,d,c\na,b,c\naa,d,c\na,b,c\naa,d,c\na,b,c\na",
-    u"a,"
-    u"a,d,c\na,b,c\naa,d,c\na,b,c\naa,d,c\na,b,c\na,",
-    u"a,d,c\na,b,c\na,\n",
-    u"a,\n",
-    u"a,\"bb\"\"b\",ca,\"bb\"\"b\",ca,\"bb\"\"b\",c",
-    u"a,\"bb,\"\"b\"c",
-    u"\"a,b\",\"b,c\"",
-    u"\"a,b\"\",\"b,c\"",
-    u"a,b\"\",b,c\"",
+    #u"a,b,c\na,b,c\na,b,c\na,b,c",
+#    u"a,d,c\na,b,c\na,d,c\na,b,c\na,d,c\na,b,c\n",
+#    u"a,d,c\na,b,c\naa,d,c\na,b,c\naa,d,c\na,b,c\na",
+#    u"a,"
+#    u"a,d,c\na,b,c\naa,d,c\na,b,c\naa,d,c\na,b,c\na,",
+#    u"a,d,c\na,b,c\na,\n",
+#    u"a,\n",
+    u"a,,b\n"
+    # u"a,\"bb\"\"b\",ca,\"bb\"\"b\",ca,\"bb\"\"b\",c",
+    # u"a,\"bb,\"\"b\"c",
+    # u"\"a,b\",\"b,c\"",
+    # u"\"a,b\"\",\"b,c\"",
+    # u"a,b\"\",b,c\"",
 ]
 
 

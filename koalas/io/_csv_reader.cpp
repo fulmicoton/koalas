@@ -41,7 +41,7 @@ bool _Field::to_int(long long* dest) const {
        Returns true if valid, or false if invalid.
        When valid, writes the result in the point dest.
      */
-
+    
     if (length == 0) {
         return false;
     }
@@ -62,7 +62,7 @@ bool _Field::to_int(long long* dest) const {
         offset++;
     }
 
-    for (; offset < length; offset++) {
+    for (; offset < length; ) {
         res *= 10;
         int digit = (*cur) - '0';
         if ((digit < 0) || (digit > 9)) {
@@ -70,6 +70,7 @@ bool _Field::to_int(long long* dest) const {
         }
         res += digit;
         cur++;
+        offset++;   
     }
     
     if (sign == 1) {
@@ -78,6 +79,7 @@ bool _Field::to_int(long long* dest) const {
     else {
         *dest = -res;
     }
+    
     return true;
 }
 
@@ -87,6 +89,7 @@ bool _Field::to_float(double* dest) const {
         return false;
     }
 
+    
     int offset=0;
     int sign = 1;
     int int_part = 0;
@@ -106,9 +109,8 @@ bool _Field::to_float(double* dest) const {
         cur++;
         offset++;
     }
-
-    for (; offset < length; offset++) {
-        res *= 10;
+    for (; offset < length;) {
+        int_part *= 10;
         int digit = (*cur) - '0';
         if ((digit < 0) || (digit > 9)) {
             if ((*cur) == '.') {
@@ -120,10 +122,12 @@ bool _Field::to_float(double* dest) const {
                 return false;    
             }    
         }
-        res += digit;
+        int_part += digit;
+        offset++;
         cur++;
     }
-    for (; offset < length; offset++) {
+    
+    for (; offset < length;) {
         int digit = (*cur) - '0';
         if ((digit < 0) || (digit > 9)) {
             return false;
@@ -131,8 +135,8 @@ bool _Field::to_float(double* dest) const {
         dec /= 10.;
         dec_part += dec * digit;
         cur++;
+        offset++;
     }
-
     res = int_part + dec_part;
     if (sign == 1) {
         *dest = res;
@@ -153,8 +157,6 @@ _CsvChunk::_CsvChunk(size_t length)
 {
     buffer = new pychar[length];
     last_pychar = buffer;
-    // current_row = new Row();
-    // rows.push_back(current_row);
 }
 
 
@@ -209,6 +211,9 @@ bool _CsvChunk::fill_int(size_t col, long long* dest) const {
     vector<Row*>::const_iterator row_it;
     for (row_it=rows.begin(); row_it!=rows.end(); ++row_it) {
         const Row& row = **row_it;
+        if (row.size() <= col) {
+            return false;
+        }
         const _Field& field = row[col];
         if (!field.to_int(dest)) {
             return false;
@@ -222,6 +227,9 @@ bool _CsvChunk::fill_int(size_t col, long long* dest) const {
 bool _CsvChunk::fill_float(size_t col, double* dest) const {
     for (size_t i=0; i<rows.size(); i++) {
         const Row& row = *rows[i];
+        if (row.size() <= col) {
+            return false; // make it NaN
+        }
         const _Field& field = row[col];
         if (!field.to_float(dest)) {
             return false;
@@ -348,6 +356,7 @@ size_t _CsvReader::_read_chunk(_CsvChunk* chunk,
                     state = QUOTED;
                 }
                 else if (cursor.token == dialect.delimiter) {
+                    chunk->new_field();
                 }
                 else if (cursor.token == LF) {
                     parsed_chars = cursor.offset;
