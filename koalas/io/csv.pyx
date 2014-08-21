@@ -32,8 +32,8 @@ cdef extern from "_csv_reader.hpp" namespace "koalas":
         void remove_row(int row_id)
         bool ok() const
         string error_msg
-        bool fill_int(int col, long long* dest) const
-        bool fill_float(int col, double* dest) const
+        bool fill_int(int col, np.int_t* dest) const
+        bool fill_float(int col, np.float_t* dest) const
 
     cdef cppclass _CsvDialect:
         _CsvDialect() except +
@@ -211,36 +211,18 @@ cdef class CsvChunk:
     def nb_cols(self,):
         return self._csv_chunk.nb_cols()    
 
-    cpdef fill_int(self, size_t col, np.ndarray[np.int64_t, ndim=1] arr, size_t offset):
-        return self._csv_chunk.fill_int(col, <long long*>arr.data + offset)
+    cpdef fill_int(self, size_t col, np.ndarray[np.int_t, ndim=1] arr, size_t offset):
+        return self._csv_chunk.fill_int(col, <np.int_t*>arr.data + offset)
 
-    cpdef fill_float(self, int col, np.ndarray[np.float64_t, ndim=1] arr, size_t offset):
-        return self._csv_chunk.fill_float(col, <double*>arr.data + offset)
+    cpdef fill_float(self, int col, np.ndarray[np.float_t, ndim=1] arr, size_t offset):
+        return self._csv_chunk.fill_float(col, <np.float_t*>arr.data + offset)
 
-
-def create_array(chunks):
-    if not chunks:
-        return np.empty((0, 0), dtype=np.object)
-    nb_cols = max(chunk.nb_cols() for chunk in chunks)
-    nb_rows = sum(chunk.nb_rows() for chunk in chunks)
-    res = np.empty((nb_rows, nb_cols), dtype=np.object)
-    row_id = 0
-    col_id = 0
-    while chunks:
-        chunk = chunks.popleft()
-        I = chunk.nb_rows()
-        J = chunk.nb_cols()
-        for i in range(I):
-            for j in range(J):
-                res[row_id, j] = chunk.get(i, j)
-            row_id += 1
-    return res
 
 DEFAULT_DIALECT = CsvDialect()
 
 
-def reader(stream, csv_dialect=DEFAULT_DIALECT, buffer_length=DEFAULT_BUFFER_SIZE):
-    return CsvReader(stream, csv_dialect, buffer_length)
+def reader(stream, dialect=DEFAULT_DIALECT, buffer_length=DEFAULT_BUFFER_SIZE):
+    return CsvReader(stream, dialect, buffer_length)
 
 
 cdef class CsvReader:
@@ -263,15 +245,6 @@ cdef class CsvReader:
 
     def __dealloc__(self):
         del self.csv_reader
-
-    def read_all(self,):
-        """ Read the csv in stream and returns a numpy array
-        containing unicode objects.
-
-        length -- the number of char handled per csv_chunk
-        """
-        csv_chunks = deque(self.chunks(buffer_size=self.buffer_length))
-        return create_array(csv_chunks)
 
     def remaining(self,):
         return self.csv_reader.remaining[:self.csv_reader.remaining_length]

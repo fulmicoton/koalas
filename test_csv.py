@@ -4,7 +4,14 @@
 from koalas import DataFrame
 from StringIO import StringIO
 import numpy as np
+import time
+from koalas.io.csv import CsvDialect
 import pandas as pd
+
+#csv_dialect=DEFAULT_DIALECT
+
+csv_dialect = CsvDialect()
+csv_dialect.delimiter = u';'
 
 def test_empty():
     # data = u"a,d,c\nc,4,1.1\nd,2,2.1\ne,4,3.2\nf,3,3.2"
@@ -12,8 +19,18 @@ def test_empty():
     stream = StringIO(data)
     #df = pd.read_csv("acquisitions_full.csv",)
     #df = DataFrame.from_csv(stream) #"acquisitions_full.csv")
-    # df = pd.read_csv("acquisitions_full.csv",)
-    df = DataFrame.from_csv("acquisitions_full.csv",)
+    dtypes = None
+    for i in range(100):
+        print "-----"
+        start = time.time()
+        df = pd.read_csv("test.csv", delimiter=";")
+        end = time.time()
+        print "pandas %s s" % (end - start)
+        start = time.time()
+        df = DataFrame.from_csv("test.csv", csv_dialect=csv_dialect, dtypes=dtypes)
+        dtypes = df.dtypes
+        end = time.time()
+        print "koalas %s s" % (end - start)
     # df = df.select(["acquired_year"])
     
     #sub_df= df.select(["acquired_year"]) #print end-start, 's'

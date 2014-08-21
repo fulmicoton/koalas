@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 
-from koalas.io.csv import CsvDialect, reader
+from koalas.io.csv import CsvDialect
 import csv
 import itertools
 from StringIO import StringIO
-
+from koalas import DataFrame
+import numpy as np
 
 """
 Known, and wanted discrepancy with csv).
 
-- return a matrix (doh)
+- return a dataframe (doh)
 - returns unicode object
 
 
@@ -36,30 +37,26 @@ def parsed_csv(s, params):
     return list(csv.reader(ss, **params))
 
 
-def copy_string(s):
-    DUMMY_STRING = u"jambon"
-    return (DUMMY_STRING + s)[len(DUMMY_STRING):]
-
-
 def parsed_koalas(s, params):
-    ss = StringIO(copy_string(s))
+    ss = StringIO(s)
     dialect = CsvDialect(**params)
-    return reader(ss, dialect).read_all()
+    df = DataFrame.from_csv(ss, columns="range", dialect=dialect)
+    return np.array(df)
 
 TEST_STRINGS = [
-    #u"a,b,c\na,b,c\na,b,c\na,b,c",
-#    u"a,d,c\na,b,c\na,d,c\na,b,c\na,d,c\na,b,c\n",
-#    u"a,d,c\na,b,c\naa,d,c\na,b,c\naa,d,c\na,b,c\na",
-#    u"a,"
-#    u"a,d,c\na,b,c\naa,d,c\na,b,c\naa,d,c\na,b,c\na,",
-#    u"a,d,c\na,b,c\na,\n",
-#    u"a,\n",
+    u"a,b,c\na,b,c\na,b,c\na,b,c",
+    u"a,d,c\na,b,c\na,d,c\na,b,c\na,d,c\na,b,c\n",
+    u"a,d,c\na,b,c\naa,d,c\na,b,c\naa,d,c\na,b,c\na",
+    u"a,"
+    u"a,d,c\na,b,c\naa,d,c\na,b,c\naa,d,c\na,b,c\na,",
+    u"a,d,c\na,b,c\na,\n",
+    u"a,\n",
     u"a,,b\n"
-    # u"a,\"bb\"\"b\",ca,\"bb\"\"b\",ca,\"bb\"\"b\",c",
-    # u"a,\"bb,\"\"b\"c",
-    # u"\"a,b\",\"b,c\"",
-    # u"\"a,b\"\",\"b,c\"",
-    # u"a,b\"\",b,c\"",
+    u"a,\"bb\"\"b\",ca,\"bb\"\"b\",ca,\"bb\"\"b\",c",
+    u"a,\"bb,\"\"b\"c",
+    u"\"a,b\",\"b,c\"",
+    u"\"a,b\"\",\"b,c\"",
+    u"a,b\"\",b,c\"",
 ]
 
 

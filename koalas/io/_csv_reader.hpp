@@ -26,8 +26,8 @@ struct _Field {
     :s(other.s)
     ,length(other.length) {}
 
-    bool to_int(long long* dest) const;
-    bool to_float(double* dest) const;
+    template<typename TInt> inline bool to_int(TInt*) const;
+    template<typename TFloat> inline bool to_float(TFloat*) const;
 
     void print() const;
 
@@ -65,7 +65,6 @@ enum Quoting {
 struct _CsvDialect {
 
     _CsvDialect();
-
     pychar delimiter;
     pychar quotechar;
     pychar escapechar;
@@ -96,8 +95,8 @@ public:
     void pop_last();
     std::string error_msg;
     void remove_row(size_t row_id);
-    bool fill_int(size_t col, long long* dest) const;
-    bool fill_float(size_t col, double* dest) const;
+    template<typename TInt> bool fill_int(size_t col, TInt* dest) const;
+    template<typename TFloat> bool fill_float(size_t col, TFloat* dest) const;
 
 private:
     pychar* last_pychar;
@@ -136,6 +135,7 @@ private:
 };
 
 
+#include "_csv_reader_impl.hpp"
 
 }
 

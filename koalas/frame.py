@@ -73,6 +73,9 @@ class ColumnRef(object):
     def __del__(self,):
         self.column.dec_ref()
 
+    def __array__(self,):
+        return self.column.get()
+
     def cell(self, row):
         return self.column.cell(row)
 
@@ -113,10 +116,13 @@ class DataFrame(object):
 
     def __init__(self, col_map):
         self.__col_map = col_map
-        self.nb_rows = col_map.values()[0].nb_rows
+        if len(col_map) == 0:
+            self.nb_rows = 0
+        else:
+            self.nb_rows = col_map.values()[0].nb_rows
 
     @staticmethod
-    def from_csv(f, dtypes=None, **kwargs):
+    def from_csv(f, columns=None, dtypes=None, **kwargs):
         stream = open_stream(f)
         chunk_it = csv.reader(stream, **kwargs).chunks()
         first_chunk = chunk_it.next()
@@ -126,7 +132,12 @@ class DataFrame(object):
             first_chunk = chunk_it.next()
             if first_chunk is None:
                 raise ValueError("Empty csv file.")
-        headers = first_chunk.pop_row()
+        if columns is None:
+            headers = first_chunk.pop_row()
+        elif columns == 'range':
+            headers = map(unicode, range(first_chunk.nb_cols()))
+        else:
+            headers = columns
         chunks = csv.ChunkCollection([first_chunk] + list(chunk_it))
         if dtypes is None:
             dtypes = chunks.guess_types()
@@ -176,9 +187,33 @@ class DataFrame(object):
         col_id = self._col_id(col)
         self.data[:, col_id] = value
 
+    @property
+    def _common_dtype(self,):
+        """ Returns the dtype of the array returned by __array__.
+
+        Basically if the dtype returned by all columns is the same,
+        return it. If they differ, return np.object.
+        """
+        dtypes_set = set(self.dtypes)
+        if len(dtypes_set) == 1:
+            return dtypes_set.pop()
+        else:
+            return np.object
+
+    def __array__(self,):
+        arr = np.empty(self.shape, self._common_dtype)
+        for (col_id, col_arr) in enumerate(self.column_arrays):
+            arr[:, col_id] = col_arr
+        return arr
+
     def pick(self, row_selector):
         """ like select but for rows """
         return self.map_columns(lambda col_val: col_val.pick(row_selector))
+
+    @property
+    def column_arrays(self,):
+        """ Returns a list of 1D numpy array representing the columns"""
+        return [np.array(col) for col in self.__col_map.values()]
 
     def map_columns(self, f):
         return DataFrame(col_map=OrderedDict(
